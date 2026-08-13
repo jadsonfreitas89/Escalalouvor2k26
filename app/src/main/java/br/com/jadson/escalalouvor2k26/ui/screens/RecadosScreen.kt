@@ -1,5 +1,6 @@
 package br.com.jadson.escalalouvor2k26.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -88,6 +89,9 @@ fun RecadosScreen(navController: NavController, viewModel: EscalaViewModel) {
                                     isLider = isLider,
                                     onEditClick = {
                                         navController.navigate(Screen.EditRecado.createRoute(recado.id))
+                                    },
+                                    onImageClick = { id ->
+                                        navController.navigate(Screen.ImageViewer.createRoute(id))
                                     }
                                 )
                             }
@@ -104,7 +108,8 @@ fun RecadosScreen(navController: NavController, viewModel: EscalaViewModel) {
 fun RecadoCard(
     recado: Recado,
     isLider: Boolean = false,
-    onEditClick: () -> Unit = {}
+    onEditClick: () -> Unit = {},
+    onImageClick: (String) -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -115,9 +120,14 @@ fun RecadoCard(
             if (!recado.imagemUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = recado.imagemUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentScale = ContentScale.Crop
+                    contentDescription = "Tocar para ampliar",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .clickable { onImageClick(recado.id) },
+                    contentScale = ContentScale.Crop,
+                    error = androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_report_image),
+                    placeholder = androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_gallery)
                 )
             }
             Column(modifier = Modifier.padding(20.dp)) {

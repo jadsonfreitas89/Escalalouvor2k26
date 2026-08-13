@@ -17,9 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import br.com.jadson.escalalouvor2k26.data.model.Escala
+import br.com.jadson.escalalouvor2k26.data.model.Integrante
 import br.com.jadson.escalalouvor2k26.ui.theme.PrimaryOrange
 import br.com.jadson.escalalouvor2k26.ui.theme.SurfaceDark
 import br.com.jadson.escalalouvor2k26.ui.viewmodel.EscalaViewModel
+import br.com.jadson.escalalouvor2k26.ui.viewmodel.UiState
 
 @Composable
 fun NextEscalaDialog(
@@ -29,7 +31,10 @@ fun NextEscalaDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val uiState by viewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(null) }
     val currentUser by viewModel?.currentUser?.collectAsState() ?: remember { mutableStateOf(null) }
+    
+    val integrantes = if (uiState is UiState.Success) (uiState as UiState.Success).data.integrantes else emptyList()
     
     val isLider = currentUser?.funcao?.uppercase()?.contains("LIDER") == true
     val isDirigente = currentUser?.funcao?.uppercase()?.contains("DIRIGENTE") == true
@@ -85,7 +90,8 @@ fun NextEscalaDialog(
                     InfoRowEditable(label = "Vocal", value = escala.vocal, hasEditPermission = isLider, onEdit = { fieldToEdit = "vocal"; initialValue = escala.vocal; showEditDialog = true })
                     
                     // MÚSICOS (Líder pode editar)
-                    InfoRowEditable(label = "Músicos", value = escala.musicos, hasEditPermission = isLider, onEdit = { fieldToEdit = "musicos"; initialValue = escala.musicos; showEditDialog = true })
+                    val musicosComInstrumento = formatMusiciansWithInstrument(escala.musicos, integrantes)
+                    InfoRowEditable(label = "Músicos", value = musicosComInstrumento, hasEditPermission = isLider, onEdit = { fieldToEdit = "musicos"; initialValue = escala.musicos; showEditDialog = true })
                     
                     // MESÁRIO (Líder pode editar)
                     InfoRowEditable(label = "Mesário", value = escala.mesario, hasEditPermission = isLider, onEdit = { fieldToEdit = "mesario"; initialValue = escala.mesario; showEditDialog = true })
@@ -104,6 +110,18 @@ fun NextEscalaDialog(
             }
         }
     }
+}
+
+fun formatMusiciansWithInstrument(musicos: String?, integrantes: List<Integrante>): String {
+    if (musicos.isNullOrBlank()) return ""
+    return musicos.split(", ").map { nome ->
+        val integrante = integrantes.find { it.nome.equals(nome, ignoreCase = true) }
+        if (integrante != null && integrante.instrumento.isNotBlank()) {
+            "$nome — ${integrante.instrumento}"
+        } else {
+            nome
+        }
+    }.joinToString("\n• ", prefix = "• ")
 }
 
 @Composable

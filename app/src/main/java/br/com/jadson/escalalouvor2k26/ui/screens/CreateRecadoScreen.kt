@@ -1,9 +1,12 @@
 package br.com.jadson.escalalouvor2k26.ui.screens
 
+import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import br.com.jadson.escalalouvor2k26.ui.theme.PrimaryOrange
 import br.com.jadson.escalalouvor2k26.ui.theme.SurfaceDark
@@ -48,6 +52,28 @@ fun CreateRecadoScreen(navController: androidx.navigation.NavController, viewMod
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    fun createImageFile(): File {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+        return File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
+    }
+
+    fun resizeBitmap(source: Bitmap, maxSide: Int): Bitmap {
+        if (source.width <= maxSide && source.height <= maxSide) return source
+        val ratio: Float = source.width.toFloat() / source.height.toFloat()
+        val targetWidth: Int
+        val targetHeight: Int
+        if (source.width > source.height) {
+            targetWidth = maxSide
+            targetHeight = (maxSide / ratio).toInt()
+        } else {
+            targetHeight = maxSide
+            targetWidth = (maxSide * ratio).toInt()
+        }
+        Log.d("CreateRecado", "Redimensionando imagem: ${source.width}x${source.height} -> ${targetWidth}x${targetHeight}")
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -71,10 +97,17 @@ fun CreateRecadoScreen(navController: androidx.navigation.NavController, viewMod
         }
     }
 
-    fun createImageFile(): File {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val storageDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
-        return File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            val file = createImageFile()
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            capturedImageUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "A permissão da câmera é necessária para tirar fotos.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     Scaffold(
@@ -167,10 +200,14 @@ fun CreateRecadoScreen(navController: androidx.navigation.NavController, viewMod
                     
                     Card(
                         modifier = Modifier.weight(1f).height(100.dp).clickable {
-                            val file = createImageFile()
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            capturedImageUri = uri
-                            cameraLauncher.launch(uri)
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                val file = createImageFile()
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                capturedImageUri = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = SurfaceDark)
@@ -194,10 +231,16 @@ fun CreateRecadoScreen(navController: androidx.navigation.NavController, viewMod
                     
                     var base64Image: String? = null
                     bitmap?.let {
-                        val outputStream = ByteArrayOutputStream()
-                        it.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-                        val byteArray = outputStream.toByteArray()
-                        base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                        try {
+                            val resizedBitmap = resizeBitmap(it, 1280)
+                            val outputStream = ByteArrayOutputStream()
+                            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+                            val byteArray = outputStream.toByteArray()
+                            base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                            Log.d("CreateRecado", "Payload Base64 gerado: ${base64Image?.length} caracteres. JPEG size: ${byteArray.size} bytes.")
+                        } catch (e: Exception) {
+                            Log.e("CreateRecado", "Erro ao processar imagem", e)
+                        }
                     }
 
                     viewModel.createRecado(

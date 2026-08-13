@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Configurações locais do Android Studio
+.idea/appInsightsSettings.xml
+.idea/inspectionProfiles/
+.idea/planningMode.xml

@@ -143,11 +143,11 @@ class EscalaViewModel(
                 valor = novoValor
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao criar escala.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
@@ -187,11 +187,11 @@ class EscalaViewModel(
                 uniforme = uniforme
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao criar escala.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
@@ -231,11 +231,11 @@ class EscalaViewModel(
                 uniforme = uniforme
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao criar escala.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
@@ -267,11 +267,11 @@ class EscalaViewModel(
                 status = status
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao criar escala.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
@@ -305,15 +305,22 @@ class EscalaViewModel(
                 imageBase64 = imageBase64
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Recado publicado com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao publicar recado.")
                 }
-            }.onFailure {
+            }.onFailure { error ->
+                Log.e("EscalaViewModel", "Erro ao publicar recado", error)
                 _uiState.value = UiState.Idle
-                onError("Erro ao publicar recado.")
+                val msg = when {
+                    error is java.net.SocketException && error.message?.contains("Broken pipe") == true -> 
+                        "Erro de conexão: Imagem muito grande ou falha no servidor."
+                    error is java.net.SocketTimeoutException -> "Tempo esgotado ao enviar. Verifique sua internet."
+                    else -> "Erro ao publicar recado: ${error.localizedMessage ?: "Erro de rede"}"
+                }
+                onError(msg)
             }
         }
     }
@@ -347,15 +354,50 @@ class EscalaViewModel(
                 imageBase64 = imageBase64
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem)
+                    onSuccess(response.mensagem ?: "Recado atualizado com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem)
+                    onError(response.mensagem ?: "Erro ao atualizar recado.")
+                }
+            }.onFailure { error ->
+                Log.e("EscalaViewModel", "Erro ao atualizar recado", error)
+                _uiState.value = UiState.Idle
+                val msg = when {
+                    error is java.net.SocketException && error.message?.contains("Broken pipe") == true -> 
+                        "Erro de conexão ao atualizar: Imagem muito grande."
+                    error is java.net.SocketTimeoutException -> "Tempo esgotado ao atualizar. Verifique sua internet."
+                    else -> "Erro ao atualizar recado: ${error.localizedMessage ?: "Erro de rede"}"
+                }
+                onError(msg)
+            }
+        }
+    }
+
+    fun deleteRecado(
+        id: String,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+        if (user == null || !user.funcao.uppercase().contains("LIDER")) {
+            onError("Permissão negada.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            repository.deleteRecado(id).onSuccess { response ->
+                if (response.sucesso) {
+                    onSuccess(response.mensagem ?: "Recado excluído com sucesso.")
+                    loadData()
+                } else {
+                    _uiState.value = UiState.Idle
+                    onError(response.mensagem ?: "Erro ao excluir recado.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
-                onError("Erro ao atualizar recado.")
+                onError("Erro de conexão ao excluir recado.")
             }
         }
     }

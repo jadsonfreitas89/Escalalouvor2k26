@@ -141,7 +141,10 @@ class EscalaRepository {
             )
             Result.success(response)
         } catch (e: Exception) {
-            Log.e("EscalaRepository", "Erro na criação de recado: ${e.localizedMessage}")
+            Log.e("EscalaRepository", "Erro na criação de recado. Tipo: ${e.javaClass.simpleName}, Mensagem: ${e.message}")
+            if (e is retrofit2.HttpException) {
+                Log.e("EscalaRepository", "Código HTTP: ${e.code()}. Resposta: ${e.response()?.errorBody()?.string()}")
+            }
             Result.failure(e)
         }
     }
@@ -169,7 +172,20 @@ class EscalaRepository {
             )
             Result.success(response)
         } catch (e: Exception) {
-            Log.e("EscalaRepository", "Erro na atualização de recado: ${e.localizedMessage}")
+            Log.e("EscalaRepository", "Erro na atualização de recado. Tipo: ${e.javaClass.simpleName}, Mensagem: ${e.message}")
+            if (e is retrofit2.HttpException) {
+                Log.e("EscalaRepository", "Código HTTP: ${e.code()}. Resposta: ${e.response()?.errorBody()?.string()}")
+            }
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteRecado(id: String): Result<UpdateResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = RetrofitClient.instance.deleteRecado(id = id)
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e("EscalaRepository", "Erro na exclusão de recado: ${e.localizedMessage}")
             Result.failure(e)
         }
     }

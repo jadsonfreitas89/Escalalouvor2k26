@@ -165,7 +165,7 @@ fun SelectionDialog(
     var searchQuery by remember { mutableStateOf("") }
     var selectedItems by remember { mutableStateOf(initialSelection) }
 
-    val filteredOptions = options.filter { it.nome.contains(searchQuery, ignoreCase = true) }
+    val filteredOptions = options.filter { (it.nome ?: "").contains(searchQuery, ignoreCase = true) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -202,19 +202,20 @@ fun SelectionDialog(
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(filteredOptions) { integrante ->
-                            val isSelected = selectedItems.contains(integrante.nome)
+                            val nome = integrante.nome ?: ""
+                            val isSelected = selectedItems.contains(nome)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
                                         if (isMultiple) {
                                             selectedItems = if (isSelected) {
-                                                selectedItems - integrante.nome
+                                                selectedItems - nome
                                             } else {
-                                                selectedItems + integrante.nome
+                                                selectedItems + nome
                                             }
                                         } else {
-                                            selectedItems = setOf(integrante.nome)
+                                            selectedItems = setOf(nome)
                                         }
                                     }
                                     .padding(vertical = 12.dp),
@@ -234,7 +235,16 @@ fun SelectionDialog(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(integrante.nome, color = Color.White)
+                                Column {
+                                    Text(nome, color = Color.White, fontWeight = FontWeight.Bold)
+                                    if (!(integrante.instrumento.isNullOrBlank())) {
+                                        Text(
+                                            text = integrante.instrumento,
+                                            color = PrimaryOrange,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

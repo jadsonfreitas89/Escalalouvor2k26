@@ -1,6 +1,7 @@
 package br.com.jadson.escalalouvor2k26.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -55,7 +56,7 @@ fun HomeScreen(navController: NavController, viewModel: EscalaViewModel) {
             // Header unificado
             Header(
                 userName = currentUser?.nome ?: "Visitante",
-                onProfileClick = { /* Removido conforme solicitação */ },
+                onProfileClick = { navController.navigate(Screen.Perfil.route) },
                 onRefresh = { viewModel.loadData() }
             )
 
@@ -216,7 +217,11 @@ fun Header(userName: String, onProfileClick: () -> Unit, onRefresh: () -> Unit) 
         IconButton(onClick = onProfileClick, modifier = Modifier.size(40.dp).background(SurfaceDark, CircleShape)) {
             Icon(imageVector = Icons.Default.Person, contentDescription = "Perfil", tint = PrimaryOrange, modifier = Modifier.size(24.dp))
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onProfileClick() }
+        ) {
             Text(text = "Olá, $userName!", style = MaterialTheme.typography.labelMedium, color = Color.Gray, maxLines = 1)
             Text(text = "ESCALA DE LOUVOR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1)
         }

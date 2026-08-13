@@ -62,5 +62,12 @@ fun NavGraph(
             val recadoId = backStackEntry.arguments?.getString("recadoId") ?: ""
             EditRecadoScreen(recadoId, navController, viewModel)
         }
+        composable(
+            route = Screen.ImageViewer.route,
+            arguments = listOf(navArgument("recadoId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recadoId = backStackEntry.arguments?.getString("recadoId") ?: ""
+            ImageViewerScreen(recadoId, navController, viewModel)
+        }
     }
 }

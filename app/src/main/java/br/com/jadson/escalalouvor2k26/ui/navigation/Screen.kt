@@ -28,4 +28,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object EditRecado : Screen("edit_recado/{recadoId}", "Editar Recado", Icons.Default.Edit) {
         fun createRoute(recadoId: String) = "edit_recado/$recadoId"
     }
+    object ImageViewer : Screen("image_viewer/{recadoId}", "Visualizar Imagem", Icons.Default.Announcement) {
+        fun createRoute(recadoId: String) = "image_viewer/$recadoId"
+    }
 }

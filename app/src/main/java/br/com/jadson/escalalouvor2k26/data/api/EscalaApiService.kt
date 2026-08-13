@@ -2,7 +2,10 @@ package br.com.jadson.escalalouvor2k26.data.api
 
 import br.com.jadson.escalalouvor2k26.data.model.EscalaData
 import br.com.jadson.escalalouvor2k26.data.model.UpdateResponse
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface EscalaApiService {
@@ -57,27 +60,35 @@ interface EscalaApiService {
         @Query("status") status: String
     ): UpdateResponse
 
-    @GET("exec")
+    @FormUrlEncoded
+    @POST("exec")
     suspend fun createRecado(
-        @Query("action") action: String = "createRecado",
-        @Query("nome") nome: String,
-        @Query("senha") senha: String,
-        @Query("titulo") titulo: String,
-        @Query("mensagem") mensagem: String,
-        @Query("imagemUrl") imagemUrl: String,
-        @Query("imageBase64") imageBase64: String? = null
+        @Field("action") action: String = "createRecado",
+        @Field("nome") nome: String,
+        @Field("senha") senha: String,
+        @Field("titulo") titulo: String,
+        @Field("mensagem") mensagem: String,
+        @Field("imagemUrl") imagemUrl: String,
+        @Field("imageBase64") imageBase64: String? = null
+    ): UpdateResponse
+
+    @FormUrlEncoded
+    @POST("exec")
+    suspend fun updateRecado(
+        @Field("action") action: String = "updateRecado",
+        @Field("nome") nome: String,
+        @Field("senha") senha: String,
+        @Field("id") id: String,
+        @Field("titulo") titulo: String,
+        @Field("mensagem") mensagem: String,
+        @Field("imagemUrl") imagemUrl: String,
+        @Field("ativo") ativo: String,
+        @Field("imageBase64") imageBase64: String? = null
     ): UpdateResponse
 
     @GET("exec")
-    suspend fun updateRecado(
-        @Query("action") action: String = "updateRecado",
-        @Query("nome") nome: String,
-        @Query("senha") senha: String,
-        @Query("id") id: String,
-        @Query("titulo") titulo: String,
-        @Query("mensagem") mensagem: String,
-        @Query("imagemUrl") imagemUrl: String,
-        @Query("ativo") ativo: String,
-        @Query("imageBase64") imageBase64: String? = null
+    suspend fun deleteRecado(
+        @Query("action") action: String = "deleteRecado",
+        @Query("id") id: String
     ): UpdateResponse
 }

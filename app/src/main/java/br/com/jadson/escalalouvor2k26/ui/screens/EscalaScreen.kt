@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import br.com.jadson.escalalouvor2k26.data.model.Escala
+import br.com.jadson.escalalouvor2k26.data.model.Integrante
 import br.com.jadson.escalalouvor2k26.ui.components.ErrorScreen
 import br.com.jadson.escalalouvor2k26.ui.components.LoadingScreen
 import br.com.jadson.escalalouvor2k26.ui.theme.PrimaryOrange
@@ -69,6 +70,8 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        val integrantes = if (uiState is UiState.Success) (uiState as UiState.Success).data.integrantes else emptyList()
+                        
                         if (isLider) {
                             item {
                                 Row(
@@ -106,7 +109,7 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                                 SectionHeader("PRÓXIMAS")
                             }
                             items(proximas) { (escala, _) ->
-                                EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = true)
+                                EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = true, integrantes = integrantes)
                             }
                         }
 
@@ -116,7 +119,7 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                                 SectionHeader("ANTERIORES")
                             }
                             items(anteriores) { (escala, _) ->
-                                EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = false)
+                                EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = false, integrantes = integrantes)
                             }
                         }
                         
@@ -150,7 +153,13 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun EscalaItemCard(escala: Escala, myName: String?, viewModel: EscalaViewModel, isProxima: Boolean) {
+fun EscalaItemCard(
+    escala: Escala, 
+    myName: String?, 
+    viewModel: EscalaViewModel, 
+    isProxima: Boolean,
+    integrantes: List<Integrante> = emptyList()
+) {
     var showDetails by remember { mutableStateOf(false) }
 
     if (showDetails) {
@@ -201,7 +210,12 @@ fun EscalaItemCard(escala: Escala, myName: String?, viewModel: EscalaViewModel, 
             
             InfoRowLocal("Dirigente", escala.dirigente)
             InfoRowLocal("Vocal", escala.vocal)
-            InfoRowLocal("Músicos", escala.musicos)
+            
+            val musicosFormatados = formatMusiciansWithInstrument(escala.musicos, integrantes)
+                .replace("• ", "")
+                .replace("\n", ", ")
+            
+            InfoRowLocal("Músicos", if (musicosFormatados.isBlank()) escala.musicos else musicosFormatados)
         }
     }
 }
