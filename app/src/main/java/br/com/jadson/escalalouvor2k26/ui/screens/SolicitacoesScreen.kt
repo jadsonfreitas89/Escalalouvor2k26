@@ -74,6 +74,11 @@ fun SolicitacaoCard(solicitacao: Solicitacao) {
             Text(text = "Substituto: ${solicitacao.substituto}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = "Motivo: ${solicitacao.motivo}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+            if (!solicitacao.motivoDecisao.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Resposta do Líder: ${solicitacao.motivoDecisao}", color = PrimaryOrange, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
@@ -81,9 +86,10 @@ fun SolicitacaoCard(solicitacao: Solicitacao) {
 @Composable
 fun StatusBadge(status: String) {
     val color = when (status.uppercase()) {
-        "APROVADA" -> Color(0xFF4CAF50)
+        "AUTORIZADA", "APROVADA" -> Color(0xFF4CAF50)
         "RECUSADA" -> Color(0xFFF44336)
         "PENDENTE" -> PrimaryOrange
+        "CANCELADA" -> Color.Gray
         else -> Color.Gray
     }
     Surface(

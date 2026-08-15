@@ -1,6 +1,7 @@
 package br.com.jadson.escalalouvor2k26.data.api
 
 import br.com.jadson.escalalouvor2k26.data.model.EscalaData
+import br.com.jadson.escalalouvor2k26.data.model.NotificacaoResponse
 import br.com.jadson.escalalouvor2k26.data.model.UpdateResponse
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
@@ -10,7 +11,11 @@ import retrofit2.http.Query
 
 interface EscalaApiService {
     @GET("exec")
-    suspend fun getEscalaData(): EscalaData
+    suspend fun getEscalaData(
+        @Query("action") action: String = "getEscalaData",
+        @Query("nome") nome: String? = null,
+        @Query("senha") senha: String? = null
+    ): EscalaData
 
     @GET("exec")
     suspend fun updateEscala(
@@ -51,13 +56,25 @@ interface EscalaApiService {
     ): UpdateResponse
 
     @GET("exec")
-    suspend fun updateSolicitacao(
-        @Query("action") action: String = "updateSolicitacao",
+    suspend fun createSolicitacao(
+        @Query("action") action: String = "createSolicitacao",
+        @Query("nome") nome: String,
+        @Query("senha") senha: String,
+        @Query("dataEscala") dataEscala: String,
+        @Query("substituto") substituto: String,
+        @Query("motivo") motivo: String
+    ): UpdateResponse
+
+    @GET("exec")
+    suspend fun processaSolicitacao(
+        @Query("action") action: String = "processaSolicitacao",
         @Query("nome") nome: String,
         @Query("senha") senha: String,
         @Query("dataEscala") dataEscala: String,
         @Query("quemPediu") quemPediu: String,
-        @Query("status") status: String
+        @Query("substituto") substituto: String,
+        @Query("acao") acao: String,
+        @Query("motivoDecisao") motivoDecisao: String? = null
     ): UpdateResponse
 
     @FormUrlEncoded
@@ -90,5 +107,20 @@ interface EscalaApiService {
     suspend fun deleteRecado(
         @Query("action") action: String = "deleteRecado",
         @Query("id") id: String
+    ): UpdateResponse
+
+    @GET("exec")
+    suspend fun getNotificacoes(
+        @Query("action") action: String = "getNotificacoes",
+        @Query("nome") nome: String,
+        @Query("senha") senha: String
+    ): NotificacaoResponse
+
+    @GET("exec")
+    suspend fun marcarComoLida(
+        @Query("action") action: String = "marcarNotificacaoComoLida",
+        @Query("id") id: String,
+        @Query("nome") nome: String,
+        @Query("senha") senha: String
     ): UpdateResponse
 }

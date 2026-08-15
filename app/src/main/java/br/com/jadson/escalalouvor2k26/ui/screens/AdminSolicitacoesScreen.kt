@@ -32,7 +32,7 @@ fun AdminSolicitacoesScreen(viewModel: EscalaViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Solicitações Pendentes", fontWeight = FontWeight.Bold) },
+                title = { Text("Gerenciar Solicitações", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = Color.White
@@ -45,11 +45,11 @@ fun AdminSolicitacoesScreen(viewModel: EscalaViewModel) {
                 is UiState.Loading -> LoadingScreen()
                 is UiState.Error -> ErrorScreen(state.message) { viewModel.loadData() }
                 is UiState.Success -> {
-                    val pendentes = state.data.solicitacoes.filter { it.status.uppercase() == "PENDENTE" }
+                    val solicitacoes = state.data.solicitacoes
                     
-                    if (pendentes.isEmpty()) {
+                    if (solicitacoes.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nenhuma solicitação pendente.", color = Color.Gray)
+                            Text("Nenhuma solicitação encontrada.", color = Color.Gray)
                         }
                     } else {
                         LazyColumn(
@@ -57,23 +57,25 @@ fun AdminSolicitacoesScreen(viewModel: EscalaViewModel) {
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            items(pendentes) { solicitacao ->
+                            items(solicitacoes) { solicitacao ->
                                 AdminSolicitacaoCard(
                                     solicitacao = solicitacao,
                                     onAuthorize = {
-                                        viewModel.updateSolicitacaoStatus(
+                                        viewModel.processaSolicitacao(
                                             dataEscala = solicitacao.dataEscala,
                                             quemPediu = solicitacao.quemPediu,
-                                            status = "AUTORIZADA",
+                                            substituto = solicitacao.substituto,
+                                            acao = "APROVAR",
                                             onSuccess = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
                                             onError = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
                                         )
                                     },
                                     onRefuse = {
-                                        viewModel.updateSolicitacaoStatus(
+                                        viewModel.processaSolicitacao(
                                             dataEscala = solicitacao.dataEscala,
                                             quemPediu = solicitacao.quemPediu,
-                                            status = "RECUSADA",
+                                            substituto = solicitacao.substituto,
+                                            acao = "RECUSAR",
                                             onSuccess = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
                                             onError = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
                                         )
@@ -101,30 +103,44 @@ fun AdminSolicitacaoCard(
         colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text(text = solicitacao.dataEscala, fontWeight = FontWeight.Bold, color = PrimaryOrange)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(text = solicitacao.dataEscala, fontWeight = FontWeight.Bold, color = PrimaryOrange)
+                StatusBadge(solicitacao.status)
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = "Quem pediu: ${solicitacao.quemPediu}", color = Color.White)
             Text(text = "Substituto: ${solicitacao.substituto}", color = Color.White)
             Text(text = "Motivo: ${solicitacao.motivo}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             
-            Spacer(modifier = Modifier.height(16.dp))
+            if (!solicitacao.motivoDecisao.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Resposta: ${solicitacao.motivoDecisao}", color = PrimaryOrange, style = MaterialTheme.typography.bodySmall)
+            }
+
+            if (!solicitacao.dataDecisao.isNullOrBlank()) {
+                Text(text = "Decidido em: ${solicitacao.dataDecisao}", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            }
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onRefuse,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("RECUSAR", fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onAuthorize,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("AUTORIZAR", fontWeight = FontWeight.Bold)
+            if (solicitacao.status.uppercase() == "PENDENTE") {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = onRefuse,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("RECUSAR", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onAuthorize,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("AUTORIZAR", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

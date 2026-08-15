@@ -3,18 +3,25 @@ package br.com.jadson.escalalouvor2k26.data.repository
 import android.util.Log
 import br.com.jadson.escalalouvor2k26.data.api.RetrofitClient
 import br.com.jadson.escalalouvor2k26.data.model.EscalaData
+import br.com.jadson.escalalouvor2k26.data.model.Notificacao
 import br.com.jadson.escalalouvor2k26.data.model.UpdateResponse
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 class EscalaRepository {
-    suspend fun fetchEscalaData(): Result<EscalaData> = withContext(Dispatchers.IO) {
-        try {
-            val response = RetrofitClient.instance.getEscalaData()
-            Result.success(response)
-        } catch (e: Exception) {
-            Log.e("EscalaRepository", "Erro na leitura: ${e.localizedMessage}")
-            Result.failure(e)
+    private val apiSemaphore = Semaphore(2) // Limita a 2 chamadas simultâneas
+
+    suspend fun fetchEscalaData(nome: String? = null, senha: String? = null): Result<EscalaData> = withContext(Dispatchers.IO) {
+        apiSemaphore.withPermit {
+            try {
+                val response = RetrofitClient.instance.getEscalaData(nome = nome, senha = senha)
+                Result.success(response)
+            } catch (e: Exception) {
+                Log.e("EscalaRepository", "Erro na leitura: ${e.localizedMessage}")
+                Result.failure(e)
+            }
         }
     }
 
@@ -100,24 +107,50 @@ class EscalaRepository {
         }
     }
 
-    suspend fun updateSolicitacao(
+    suspend fun createSolicitacao(
+        nome: String,
+        senha: String,
+        dataEscala: String,
+        substituto: String,
+        motivo: String
+    ): Result<UpdateResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = RetrofitClient.instance.createSolicitacao(
+                nome = nome,
+                senha = senha,
+                dataEscala = dataEscala,
+                substituto = substituto,
+                motivo = motivo
+            )
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e("EscalaRepository", "Erro na criação de solicitação: ${e.localizedMessage}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun processaSolicitacao(
         nome: String,
         senha: String,
         dataEscala: String,
         quemPediu: String,
-        status: String
+        substituto: String,
+        acao: String,
+        motivoDecisao: String? = null
     ): Result<UpdateResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = RetrofitClient.instance.updateSolicitacao(
+            val response = RetrofitClient.instance.processaSolicitacao(
                 nome = nome,
                 senha = senha,
                 dataEscala = dataEscala,
                 quemPediu = quemPediu,
-                status = status
+                substituto = substituto,
+                acao = acao,
+                motivoDecisao = motivoDecisao
             )
             Result.success(response)
         } catch (e: Exception) {
-            Log.e("EscalaRepository", "Erro na atualização de solicitação: ${e.localizedMessage}")
+            Log.e("EscalaRepository", "Erro ao processar solicitação: ${e.localizedMessage}")
             Result.failure(e)
         }
     }
@@ -186,6 +219,39 @@ class EscalaRepository {
             Result.success(response)
         } catch (e: Exception) {
             Log.e("EscalaRepository", "Erro na exclusão de recado: ${e.localizedMessage}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getNotificacoes(nome: String, senha: String): Result<List<Notificacao>> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("NOTIF_DEBUG", "Buscando notificações para: $nome")
+            val response = RetrofitClient.instance.getNotificacoes(nome = nome, senha = senha)
+            Log.d("NOTIF_DEBUG", "Resposta recebida: sucesso=${response.sucesso}")
+            if (response.sucesso) {
+                Log.d("NOTIF_DEBUG", "Quantidade recebida: ${response.notificacoes.size}")
+                response.notificacoes.forEach { n ->
+                    Log.d("NOTIF_DEBUG", "Notificação recebida: id=${n.id}, destinatario=${n.destinatario}, titulo=${n.titulo}, lida=${n.lida}")
+                }
+                Result.success(response.notificacoes)
+            } else {
+                Log.w("NOTIF_DEBUG", "Falha no backend: ${response.mensagem}")
+                Result.failure(Exception(response.mensagem))
+            }
+        } catch (e: Exception) {
+            Log.e("NOTIF_DEBUG", "Erro na chamada Retrofit: ${e.localizedMessage}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun marcarComoLida(id: String, nome: String, senha: String): Result<UpdateResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("NOTIFICACAO", "Enviando para servidor: ID=$id, Usuario=$nome")
+            val response = RetrofitClient.instance.marcarComoLida(id = id, nome = nome, senha = senha)
+            Log.d("NOTIFICACAO", "Resposta do servidor: sucesso=${response.sucesso}, mensagem=${response.mensagem}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e("NOTIFICACAO", "ERRO AO MARCAR COMO LIDA: ID=$id, Erro=${e.localizedMessage}")
             Result.failure(e)
         }
     }

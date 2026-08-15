@@ -1,16 +1,24 @@
 package br.com.jadson.escalalouvor2k26.ui.viewmodel
 
 import android.util.Log
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.asFlow
+import kotlinx.coroutines.flow.first
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import br.com.jadson.escalalouvor2k26.data.model.EscalaData
 import br.com.jadson.escalalouvor2k26.data.model.Integrante
+import br.com.jadson.escalalouvor2k26.data.model.Notificacao
 import br.com.jadson.escalalouvor2k26.data.repository.EscalaRepository
 import br.com.jadson.escalalouvor2k26.data.session.SessionManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+import com.google.gson.Gson
 
 sealed class UiState {
     object Idle : UiState()
@@ -30,6 +38,11 @@ class EscalaViewModel(
     private val _currentUser = MutableStateFlow<Integrante?>(sessionManager?.getUser())
     val currentUser: StateFlow<Integrante?> = _currentUser.asStateFlow()
 
+    private val _notificacoes = MutableStateFlow<List<Notificacao>>(emptyList())
+    val notificacoes: StateFlow<List<Notificacao>> = _notificacoes.asStateFlow()
+
+    private val gson = Gson()
+
     val pendingSolicitacoesCount: StateFlow<Int> = uiState.map { state ->
         if (state is UiState.Success) {
             state.data.solicitacoes.count { it.status.uppercase() == "PENDENTE" }
@@ -40,13 +53,126 @@ class EscalaViewModel(
 
     init {
         loadData()
-        startAutoRefresh()
+        carregarNotificacoes()
+    }
+
+    fun checkWorkerStatus(context: Context) {
+        viewModelScope.launch {
+            try {
+                val workManager = androidx.work.WorkManager.getInstance(context)
+                val workInfos = workManager.getWorkInfosForUniqueWork("EscalaNotificationWork").get()
+                
+                Log.d("NOTIF_SCHEDULE_DEBUG", "--- Diagnóstico WorkManager ---")
+                if (workInfos.isNullOrEmpty()) {
+                    Log.d("NOTIF_SCHEDULE_DEBUG", "Worker registrado? NÃO")
+                } else {
+                    Log.d("NOTIF_SCHEDULE_DEBUG", "Worker registrado? SIM (Total: ${workInfos.size})")
+                    workInfos.forEach { info ->
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "Nome único: EscalaNotificationWork")
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "ID: ${info.id}")
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "Estado atual: ${info.state}")
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "Tentativas: ${info.runAttemptCount}")
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "Constraints: ${info.constraints}")
+                        
+                        val nextExecution = if (info.state == androidx.work.WorkInfo.State.ENQUEUED) "Agendado" else "N/A"
+                        Log.d("NOTIF_SCHEDULE_DEBUG", "Próxima execução estimada: $nextExecution")
+                    }
+                }
+                Log.d("NOTIF_SCHEDULE_DEBUG", "-------------------------------")
+            } catch (e: Exception) {
+                Log.e("NOTIF_SCHEDULE_DEBUG", "Erro ao verificar worker: ${e.message}")
+            }
+        }
+    }
+
+    fun runBackgroundTest(context: Context, onScheduled: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val workManager = WorkManager.getInstance(context)
+                
+                val constraints = androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                    .build()
+
+                // Adicionamos um delay inicial de 10 segundos para dar tempo de fechar o app
+                val testRequest = androidx.work.OneTimeWorkRequest.Builder(br.com.jadson.escalalouvor2k26.worker.NotificationWorker::class.java)
+                    .setConstraints(constraints)
+                    .setInitialDelay(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .addTag("NOTIF_BACKGROUND_TEST")
+                    .build()
+
+                workManager.enqueue(testRequest)
+
+                Log.d("NOTIF_BACKGROUND_TEST", "--- DIAGNÓSTICO FASE 2 ---")
+                Log.d("NOTIF_BACKGROUND_TEST", "TESTE ENFILEIRADO COM DELAY DE 15s")
+                Log.d("NOTIF_BACKGROUND_TEST", "ID = ${testRequest.id}")
+
+                val initialInfo = workManager.getWorkInfoById(testRequest.id).get()
+                Log.d("NOTIF_BACKGROUND_TEST", "ESTADO INICIAL = ${initialInfo?.state}")
+
+                onScheduled("Agendado! FECHE O APP AGORA (você tem 10 segundos).")
+                
+                workManager.getWorkInfoByIdLiveData(testRequest.id).asFlow().collect { info ->
+                    info?.let {
+                        Log.d("NOTIF_BACKGROUND_TEST", "STATUS ATUAL = ${it.state}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("NOTIF_BACKGROUND_TEST", "Erro ao agendar teste: ${e.message}")
+            }
+        }
+    }
+
+    fun carregarNotificacoes() {
+        val user = _currentUser.value ?: return
+        Log.d("NOTIF_DEBUG", "getNotificacoes INICIO")
+        Log.d("NOTIF_DEBUG", "Usuário enviado: ${user.nome}")
+        
+        viewModelScope.launch {
+            Log.d("NOTIF_DEBUG", "Buscando notificações...")
+            repository.getNotificacoes(user.nome, user.senha)
+                .onSuccess { list ->
+                    // Filtrar apenas o destinatário atual (segurança extra no client) e não lidas
+                    val filtradas = list.filter { 
+                        it.destinatario.equals(user.nome, ignoreCase = true) && it.lida.uppercase() == "NAO"
+                    }
+                    Log.d("NOTIF_DEBUG", "Estado atualizado com ${filtradas.size} notificações")
+                    _notificacoes.value = filtradas
+                }
+                .onFailure { error ->
+                    Log.e("NOTIF_DEBUG", "Erro no ViewModel: ${error.message}")
+                }
+            Log.d("NOTIF_DEBUG", "getNotificacoes FIM")
+        }
+    }
+
+    fun marcarNotificacaoComoLida(id: String, onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        val user = _currentUser.value ?: return
+        Log.d("NOTIFICACAO", "Marcando como lida: ID=$id")
+        viewModelScope.launch {
+            repository.marcarComoLida(id, user.nome, user.senha)
+                .onSuccess { response ->
+                    if (response.sucesso) {
+                        Log.d("NOTIFICACAO", "Status persistido com sucesso para ID=$id")
+                        // Remove da lista local para atualizar a UI imediatamente
+                        _notificacoes.value = _notificacoes.value.filter { it.id != id }
+                        onResult(true, response.mensagem ?: "Notificação lida.")
+                    } else {
+                        Log.e("NOTIFICACAO", "Servidor retornou erro ao persistir ID=$id: ${response.mensagem}")
+                        onResult(false, response.mensagem ?: "Erro ao marcar como lida.")
+                    }
+                }
+                .onFailure { error ->
+                    Log.e("NOTIFICACAO", "Falha na rede ao persistir status para ID=$id")
+                    onResult(false, "Erro de rede: ${error.localizedMessage}")
+                }
+        }
     }
 
     fun login(nome: String, senha: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            repository.fetchEscalaData()
+            repository.fetchEscalaData(nome, senha)
                 .onSuccess { data ->
                     val user = data.integrantes.find { 
                         it.nome.equals(nome.trim(), ignoreCase = true) && it.senha.trim() == senha.trim() 
@@ -55,6 +181,7 @@ class EscalaViewModel(
                         sessionManager?.saveSession(user)
                         _currentUser.value = user
                         _uiState.value = UiState.Success(data)
+                        carregarNotificacoes() // Carregar notificações imediatamente após login
                         onSuccess()
                     } else {
                         _uiState.value = UiState.Success(data)
@@ -80,31 +207,18 @@ class EscalaViewModel(
         onLogout()
     }
 
-    private fun startAutoRefresh() {
-        viewModelScope.launch {
-            while (isActive) {
-                delay(30_000)
-                fetchDataSilently()
-            }
-        }
-    }
-
-    private suspend fun fetchDataSilently() {
-        repository.fetchEscalaData()
-            .onSuccess { data ->
-                _uiState.value = UiState.Success(data)
-            }
-    }
-
     fun loadData() {
         viewModelScope.launch {
             if (_uiState.value !is UiState.Success) {
                 _uiState.value = UiState.Loading
             }
             
-            repository.fetchEscalaData()
+            val user = _currentUser.value
+            repository.fetchEscalaData(user?.nome, user?.senha)
                 .onSuccess { data ->
                     _uiState.value = UiState.Success(data)
+                    sessionManager?.saveLastData(gson.toJson(data))
+                    carregarNotificacoes() // Carregar notificações após carregar os dados principais
                 }
                 .onFailure { error ->
                     Log.e("EscalaViewModel", "Erro ao carregar dados", error)
@@ -128,13 +242,31 @@ class EscalaViewModel(
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
-        if (user == null || user.funcao.uppercase().contains("DIRIGENTE").not()) {
+        if (user == null) {
+            onError("Usuário não autenticado.")
+            return
+        }
+
+        val isLider = user.funcao.uppercase().contains("LIDER")
+        val isDirigente = user.funcao.uppercase().contains("DIRIGENTE")
+        
+        // LIDER pode editar tudo. DIRIGENTE pode editar louvores e uniforme.
+        val hasPermission = when (campo.lowercase()) {
+            "louvores", "uniforme" -> isLider || isDirigente
+            else -> isLider
+        }
+
+        if (!hasPermission) {
             onError("Você não possui permissão para realizar esta alteração.")
             return
         }
 
+        val startTime = System.currentTimeMillis()
+        Log.d("PERF_DEBUG", "INICIO_OPERACAO: updateEscalaField ($campo -> $novoValor)")
+
         viewModelScope.launch {
             _uiState.value = UiState.Loading
+            Log.d("PERF_DEBUG", "ENVIO_REQUEST: Enviando atualização")
             repository.updateEscala(
                 nome = user.nome,
                 senha = user.senha,
@@ -142,14 +274,17 @@ class EscalaViewModel(
                 campo = campo,
                 valor = novoValor
             ).onSuccess { response ->
+                Log.d("PERF_DEBUG", "RESPOSTA_RECEBIDA: Sucesso=${response.sucesso} em ${System.currentTimeMillis() - startTime}ms")
                 if (response.sucesso) {
-                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
+                    onSuccess(response.mensagem ?: "Campo atualizado com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem ?: "Erro ao criar escala.")
+                    onError(response.mensagem ?: "Erro ao atualizar campo.")
                 }
+                Log.d("PERF_DEBUG", "FIM_OPERACAO: Concluído em ${System.currentTimeMillis() - startTime}ms")
             }.onFailure {
+                Log.e("PERF_DEBUG", "ERRO_OPERACAO: Falha após ${System.currentTimeMillis() - startTime}ms")
                 _uiState.value = UiState.Idle
                 onError("Erro de conexão ao tentar salvar.")
             }
@@ -187,11 +322,11 @@ class EscalaViewModel(
                 uniforme = uniforme
             ).onSuccess { response ->
                 if (response.sucesso) {
-                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
+                    onSuccess(response.mensagem ?: "Escala atualizada com sucesso.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem ?: "Erro ao criar escala.")
+                    onError(response.mensagem ?: "Erro ao atualizar escala.")
                 }
             }.onFailure {
                 _uiState.value = UiState.Idle
@@ -244,36 +379,92 @@ class EscalaViewModel(
         }
     }
 
-    fun updateSolicitacaoStatus(
+    fun createSolicitacao(
         dataEscala: String,
-        quemPediu: String,
-        status: String,
+        substituto: String,
+        motivo: String,
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
-        val user = _currentUser.value
-        if (user == null || !user.funcao.uppercase().contains("LIDER")) {
-            onError("Permissão negada.")
-            return
-        }
+        val user = _currentUser.value ?: return onError("Usuário não autenticado.")
+        val startTime = System.currentTimeMillis()
+        Log.d("PERF_DEBUG", "INICIO_OPERACAO: createSolicitacao para $dataEscala")
 
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            repository.updateSolicitacao(
+            Log.d("PERF_DEBUG", "ENVIO_REQUEST: Enviando solicitação")
+            repository.createSolicitacao(
+                nome = user.nome,
+                senha = user.senha,
+                dataEscala = dataEscala,
+                substituto = substituto,
+                motivo = motivo
+            ).onSuccess { response ->
+                Log.d("PERF_DEBUG", "RESPOSTA_RECEBIDA: Sucesso=${response.sucesso} em ${System.currentTimeMillis() - startTime}ms")
+                if (response.sucesso) {
+                    onSuccess(response.mensagem ?: "Solicitação enviada.")
+                    loadData()
+                } else {
+                    _uiState.value = UiState.Idle
+                    onError(response.mensagem ?: "Erro ao enviar solicitação.")
+                }
+                Log.d("PERF_DEBUG", "FIM_OPERACAO: Concluído em ${System.currentTimeMillis() - startTime}ms")
+            }.onFailure {
+                Log.e("PERF_DEBUG", "ERRO_OPERACAO: Falha após ${System.currentTimeMillis() - startTime}ms")
+                _uiState.value = UiState.Idle
+                onError("Erro de rede.")
+            }
+        }
+    }
+
+    fun processaSolicitacao(
+        dataEscala: String,
+        quemPediu: String,
+        substituto: String,
+        acao: String, // APROVAR, RECUSAR, CANCELAR
+        motivoDecisao: String? = null,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value ?: return onError("Usuário não autenticado.")
+
+        // Validações de permissão no ViewModel (também feitas no Backend)
+        if ((acao == "APROVAR" || acao == "RECUSAR") && !user.funcao.uppercase().contains("LIDER")) {
+            onError("Somente o Líder pode realizar esta ação.")
+            return
+        }
+        
+        if (acao == "CANCELAR" && !user.nome.equals(quemPediu, ignoreCase = true)) {
+            onError("Somente o solicitante pode cancelar.")
+            return
+        }
+
+        val startTime = System.currentTimeMillis()
+        Log.d("PERF_DEBUG", "INICIO_OPERACAO: processaSolicitacao ($acao) para $dataEscala")
+
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            Log.d("PERF_DEBUG", "ENVIO_REQUEST: Enviando processamento")
+            repository.processaSolicitacao(
                 nome = user.nome,
                 senha = user.senha,
                 dataEscala = dataEscala,
                 quemPediu = quemPediu,
-                status = status
+                substituto = substituto,
+                acao = acao,
+                motivoDecisao = motivoDecisao
             ).onSuccess { response ->
+                Log.d("PERF_DEBUG", "RESPOSTA_RECEBIDA: Sucesso=${response.sucesso} em ${System.currentTimeMillis() - startTime}ms")
                 if (response.sucesso) {
-                    onSuccess(response.mensagem ?: "Escala criada com sucesso.")
+                    onSuccess(response.mensagem ?: "Operação realizada.")
                     loadData()
                 } else {
                     _uiState.value = UiState.Idle
-                    onError(response.mensagem ?: "Erro ao criar escala.")
+                    onError(response.mensagem ?: "Erro ao processar solicitação.")
                 }
+                Log.d("PERF_DEBUG", "FIM_OPERACAO: Concluído em ${System.currentTimeMillis() - startTime}ms")
             }.onFailure {
+                Log.e("PERF_DEBUG", "ERRO_OPERACAO: Falha após ${System.currentTimeMillis() - startTime}ms")
                 _uiState.value = UiState.Idle
                 onError("Erro de rede.")
             }

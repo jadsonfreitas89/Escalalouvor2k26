@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +44,8 @@ fun NextEscalaDialog(
     var fieldToEdit by remember { mutableStateOf("") }
     var initialValue by remember { mutableStateOf("") }
 
+    var showSolicitarTroca by remember { mutableStateOf(false) }
+
     if (showEditDialog) {
         EditFieldDialog(
             title = "Editar ${fieldToEdit.replaceFirstChar { it.uppercase() }}",
@@ -60,6 +63,28 @@ fun NextEscalaDialog(
                     onError = { err ->
                         Toast.makeText(context, err, Toast.LENGTH_LONG).show()
                     }
+                )
+            }
+        )
+    }
+
+    if (showSolicitarTroca && currentUser != null) {
+        SolicitacaoTrocaDialog(
+            escala = escala,
+            currentUser = currentUser!!,
+            integrantes = integrantes,
+            onDismiss = { showSolicitarTroca = false },
+            onConfirm = { substituto, motivo ->
+                viewModel?.createSolicitacao(
+                    dataEscala = escala.data,
+                    substituto = substituto,
+                    motivo = motivo,
+                    onSuccess = {
+                        Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                        showSolicitarTroca = false
+                        onDismiss()
+                    },
+                    onError = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
                 )
             }
         )
@@ -104,8 +129,119 @@ fun NextEscalaDialog(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                if (getMyRole(escala, currentUser?.nome) != null) {
+                    Button(
+                        onClick = { showSolicitarTroca = true },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = PrimaryOrange)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Solicitar Troca", color = PrimaryOrange, fontWeight = FontWeight.Bold)
+                    }
+                }
+
                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange), shape = RoundedCornerShape(16.dp)) {
                     Text("Fechar", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SolicitacaoTrocaDialog(
+    escala: Escala,
+    currentUser: Integrante,
+    integrantes: List<Integrante>,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    val context = LocalContext.current
+    var substituto by remember { mutableStateOf("") }
+    var motivo by remember { mutableStateOf("") }
+    val myRole = getMyRole(escala, currentUser.nome) ?: ""
+    val myInstrument = getMyInstrument(escala, currentUser.nome, integrantes) ?: ""
+
+    // Filtrar integrantes compatíveis
+    val options = integrantes.filter { it.nome != currentUser.nome }.filter { integrante ->
+        when (myRole) {
+            "Dirigente" -> integrante.funcao.contains("Dirigente", ignoreCase = true) || integrante.funcao.contains("Lider", ignoreCase = true)
+            "Vocal" -> integrante.funcao.contains("Vocal", ignoreCase = true) || integrante.funcao.contains("Integrante", ignoreCase = true)
+            "Músico" -> {
+                if (myInstrument.isNotBlank()) {
+                    integrante.instrumento.contains(myInstrument, ignoreCase = true) || integrante.funcao.contains("Musico", ignoreCase = true)
+                } else {
+                    integrante.funcao.contains("Musico", ignoreCase = true)
+                }
+            }
+            "Mesário" -> integrante.funcao.contains("Mesário", ignoreCase = true) || integrante.funcao.contains("Mesario", ignoreCase = true)
+            else -> true
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
+                Text("Solicitar Troca", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Data: ${escala.data}", color = PrimaryOrange)
+                Text("Sua função: $myRole", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                if (myInstrument.isNotBlank()) {
+                    Text("Instrumento: $myInstrument", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Substituto:", color = PrimaryOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                SingleSelectionField(label = "Substituto", value = substituto, options = options) { substituto = it }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Motivo:", color = PrimaryOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                OutlinedTextField(
+                    value = motivo,
+                    onValueChange = { motivo = it },
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    placeholder = { Text("Informe o motivo...", color = Color.DarkGray) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = PrimaryOrange, unfocusedBorderColor = Color.Gray)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancelar", color = Color.Gray) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (substituto.isBlank()) {
+                                Toast.makeText(context, "Selecione um substituto.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (motivo.isBlank()) {
+                                Toast.makeText(context, "Informe o motivo da solicitação.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            
+                            // Verificar disponibilidade do substituto
+                            if (getMyRole(escala, substituto) != null) {
+                                Toast.makeText(context, "Este integrante já está escalado nesta data.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            onConfirm(substituto, motivo)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange),
+                        enabled = substituto.isNotBlank() && motivo.isNotBlank()
+                    ) {
+                        Text("Enviar", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -183,4 +319,21 @@ fun getMyRole(escala: Escala, myName: String?): String? {
         escala.mesario.lowercase().contains(name) -> "Mesário"
         else -> null
     }
+}
+
+fun getMyInstrument(escala: Escala, myName: String?, integrantes: List<Integrante>): String? {
+    if (myName == null) return null
+    val name = myName.trim().lowercase()
+    
+    // Se for músico, tentar achar o instrumento na string de músicos ou no perfil
+    if (escala.musicos.lowercase().contains(name)) {
+        // Exemplo de formato: "Jadson — Violino, Pedro — Teclado"
+        val part = escala.musicos.split(", ").find { it.lowercase().contains(name) }
+        if (part?.contains(" — ") == true) {
+            return part.split(" — ").getOrNull(1)
+        }
+        // Se não achou na escala, pega do integrante
+        return integrantes.find { it.nome.equals(myName, ignoreCase = true) }?.instrumento
+    }
+    return null
 }
