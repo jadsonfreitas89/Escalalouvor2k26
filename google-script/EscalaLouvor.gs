@@ -1,36 +1,40 @@
-// ============================================================
-// ESCALA DE LOUVOR 2K26
-// GOOGLE APPS SCRIPT - BACKEND ÚNICO
-// ============================================================
-//
-// Backend único e consolidado.
-//
-// Compatível com:
-// br.com.jadson.escalalouvor2k26.data.repository.EscalaRepository
-//
-// FUNCIONALIDADES:
-//
-// - ESCALA
-// - INTEGRANTES
-// - SOLICITAÇÕES
-// - RECADOS
-// - GOOGLE DRIVE
-// - NOTIFICAÇÕES
-//
-// NOTIFICAÇÕES:
-//
-// - Criar para usuário
-// - Criar para todos
-// - Criar para líderes
-// - Buscar notificações
-// - Marcar uma como lida
-// - Marcar todas como lidas
-// - Excluir uma
-// - Limpar todas as lidas
-// - Proteção contra duplicação
-//
-// ============================================================
-
+/**
+ * ================================================================
+ * ESCALA DE LOUVOR 2K26
+ * BACKEND GOOGLE APPS SCRIPT — UNIFICADO FINAL
+ * ================================================================
+ *
+ * CONSOLIDAÇÃO:
+ * - Backend atual;
+ * - Alterações adicionadas pela IA do Android Studio;
+ * - Integração de louvores com links do YouTube.
+ *
+ * REGRA DA CONSOLIDAÇÃO:
+ * Uma única implementação por funcionalidade.
+ * Quando a IA criou funções duplicadas, a lógica robusta existente
+ * foi preservada e os nomes novos foram mantidos como aliases.
+ *
+ * PRESERVADO:
+ * - Escalas
+ * - Integrantes
+ * - Solicitações de troca
+ * - Recados
+ * - Notificações
+ * - Google Drive
+ * - Tratamento de datas
+ * - Normalização de dados
+ * - LockService
+ * - Compatibilidade com ações anteriores
+ * - Louvores e links do YouTube
+ *
+ * YOUTUBE:
+ * - Aba LINK_LOUVORES
+ * - Data, ordem, louvor e link
+ * - Sincronização por data
+ * - Leitura dos links junto com a escala
+ *
+ * ================================================================
+ */
 
 // ============================================================
 // CONFIGURAÇÕES
@@ -120,6 +124,13 @@ function handleRequest(e) {
 
         break;
 
+
+      // ======================================================
+      // LOUVORES / YOUTUBE
+      // ======================================================
+      case "getLinkLouvores":
+        response = getLinkLouvores(params);
+        break;
 
       // ======================================================
       // NOTIFICAÇÕES
@@ -235,6 +246,23 @@ function handleRequest(e) {
       // ======================================================
       // SOLICITAÇÕES
       // ======================================================
+
+      // ======================================================
+      // COMPATIBILIDADE COM AÇÕES "Action"
+      // ======================================================
+      // Algumas versões geradas pela IA usam estes nomes.
+      // Mantemos os nomes como aliases, sem duplicar a lógica.
+      case "createEscalaAction":
+        response = createEscala(params);
+        break;
+
+      case "updateEscalaAction":
+        response = updateEscala(params);
+        break;
+
+      case "updateFullEscalaAction":
+        response = updateFullEscala(params);
+        break;
 
       case "createSolicitacao":
 
@@ -504,6 +532,14 @@ function getEscalaData(params) {
           ss,
           ABA_RECADOS,
           mapRecado
+        ),
+
+      // Detalhes dos louvores e respectivos vídeos do YouTube.
+      link_louvores:
+        getSheetData(
+          ss,
+          ABA_LINK_LOUVORES,
+          mapLinkLouvor
         )
 
     };
@@ -522,7 +558,8 @@ function getEscalaData(params) {
       escala: [],
       integrantes: [],
       solicitacoes: [],
-      recados: []
+      recados: [],
+      link_louvores: []
 
     };
 
@@ -675,6 +712,199 @@ function mapEscala(row) {
 
 }
 
+
+// ============================================================
+// LOUVORES / YOUTUBE
+// ============================================================
+// Estrutura da aba LINK_LOUVORES:
+// ID | DATA | ORDEM | LOUVOR | LINK_YOUTUBE
+//
+// Esta camada é independente da aba ESCALA. A coluna LOUVORES
+// continua armazenando o resumo exibido na escala, enquanto
+// LINK_LOUVORES guarda cada louvor individual e seu vídeo.
+
+var ABA_LINK_LOUVORES = "LINK_LOUVORES";
+
+function mapLinkLouvor(row) {
+  return {
+    id: safeString(row[0]),
+    data: formatDateBR(row[1]),
+    ordem: safeString(row[2]),
+    louvor: safeString(row[3]),
+    link_youtube: normalizarLinkYouTube(row[4])
+  };
+}
+
+function obterAbaLinkLouvores(ss, criarSeNaoExistir) {
+  var sheet = getSheetSecure(ss, ABA_LINK_LOUVORES);
+
+  if (!sheet && criarSeNaoExistir) {
+    sheet = ss.insertSheet(ABA_LINK_LOUVORES);
+    sheet.getRange(1, 1, 1, 5).setValues([[
+      "ID", "DATA", "ORDEM", "LOUVOR", "LINK_YOUTUBE"
+    ]]);
+  }
+
+  return sheet;
+}
+
+function garantirEstruturaLinkLouvores(sheet) {
+  if (!sheet) return false;
+
+  var headers = sheet.getLastColumn() > 0
+    ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    : [];
+
+  var obrigatorios = ["ID", "DATA", "ORDEM", "LOUVOR", "LINK_YOUTUBE"];
+
+  for (var i = 0; i < obrigatorios.length; i++) {
+    var esperado = normalizarTexto(obrigatorios[i]);
+    var encontrado = false;
+
+    for (var j = 0; j < headers.length; j++) {
+      if (normalizarTexto(headers[j]) === esperado) {
+        encontrado = true;
+        break;
+      }
+    }
+
+    if (!encontrado) {
+      var novaColuna = sheet.getLastColumn() + 1;
+      sheet.getRange(1, novaColuna).setValue(obrigatorios[i]);
+      headers.push(obrigatorios[i]);
+    }
+  }
+
+  return true;
+}
+
+function normalizarLinkYouTube(url) {
+  var valor = safeString(url).trim();
+  if (!valor) return "";
+
+  valor = valor.replace(/[\\s<>"']/g, "");
+
+  // Aceita links HTTP/HTTPS. Não executamos nem baixamos o conteúdo.
+  if (!/^https?:\/\//i.test(valor)) return "";
+
+  return valor;
+}
+
+function obterLinksLouvoresPorData(ss, dataEscala) {
+  var sheet = obterAbaLinkLouvores(ss, false);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+
+  var dados = sheet.getDataRange().getValues();
+  var resultado = [];
+
+  for (var i = 1; i < dados.length; i++) {
+    if (!sameDate(dados[i][1], dataEscala)) continue;
+    resultado.push(mapLinkLouvor(dados[i]));
+  }
+
+  resultado.sort(function(a, b) {
+    var oa = parseInt(a.ordem, 10);
+    var ob = parseInt(b.ordem, 10);
+    oa = isNaN(oa) ? 999999 : oa;
+    ob = isNaN(ob) ? 999999 : ob;
+    return oa - ob;
+  });
+
+  return resultado;
+}
+
+/**
+ * Sincroniza os detalhes dos louvores com a aba LINK_LOUVORES.
+ *
+ * O aplicativo pode enviar:
+ * [
+ *   {
+ *     ordem: 1,
+ *     louvor: "Nome do louvor",
+ *     link_youtube: "https://..."
+ *   }
+ * ]
+ *
+ * Os registros da data são substituídos pelo estado atual enviado.
+ * Isso evita que links antigos permaneçam associados à escala.
+ */
+function syncLinkLouvores(ss, dataEscala, louvoresJson) {
+  if (!ss) {
+    return { sucesso: false, mensagem: "Planilha não informada." };
+  }
+
+  var sheet = obterAbaLinkLouvores(ss, true);
+  garantirEstruturaLinkLouvores(sheet);
+
+  var detalhes;
+  try {
+    detalhes = typeof louvoresJson === "string"
+      ? JSON.parse(louvoresJson)
+      : louvoresJson;
+  } catch (error) {
+    return {
+      sucesso: false,
+      mensagem: "Os detalhes dos louvores não estão em um JSON válido."
+    };
+  }
+
+  if (!Array.isArray(detalhes)) {
+    return {
+      sucesso: false,
+      mensagem: "Os detalhes dos louvores devem ser uma lista."
+    };
+  }
+
+  var dataNormalizada = safeString(dataEscala).trim();
+  if (!dataNormalizada) {
+    return {
+      sucesso: false,
+      mensagem: "Data da escala não informada para sincronizar os louvores."
+    };
+  }
+
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (sameDate(values[i][1], dataNormalizada)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+
+  var rows = [];
+  for (var j = 0; j < detalhes.length; j++) {
+    var item = detalhes[j] || {};
+    var louvor = safeString(
+      item.louvor || item.nome || item.titulo
+    ).trim();
+
+    if (!louvor) continue;
+
+    var ordem = item.ordem !== undefined && item.ordem !== null
+      ? safeString(item.ordem).trim()
+      : String(j + 1);
+
+    rows.push([
+      safeString(item.id).trim() || Utilities.getUuid(),
+      dataNormalizada,
+      ordem,
+      louvor,
+      normalizarLinkYouTube(
+        item.link_youtube || item.linkYoutube || item.youtube
+      )
+    ]);
+  }
+
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5)
+      .setValues(rows);
+  }
+
+  return {
+    sucesso: true,
+    mensagem: "Links dos louvores sincronizados com sucesso.",
+    quantidade: rows.length
+  };
+}
 
 // ============================================================
 // INTEGRANTE
@@ -947,6 +1177,19 @@ function createEscala(p) {
     ]);
 
 
+    // Sincroniza os detalhes dos louvores somente quando enviados pelo Android.
+    if (p.louvores_detalhes || p.louvoresDetalhes) {
+      var syncResultado = syncLinkLouvores(
+        ss,
+        data,
+        p.louvores_detalhes || p.louvoresDetalhes
+      );
+
+      if (!syncResultado.sucesso) {
+        return syncResultado;
+      }
+    }
+
     criarNotificacaoParaTodos(
 
       ss,
@@ -1086,6 +1329,17 @@ function updateEscala(p) {
             safeString(p.valor)
           );
 
+        if (campo === "louvores" && (p.louvores_detalhes || p.louvoresDetalhes)) {
+          var syncResultado = syncLinkLouvores(
+            ss,
+            p.data,
+            p.louvores_detalhes || p.louvoresDetalhes
+          );
+
+          if (!syncResultado.sucesso) return syncResultado;
+        }
+
+
 
         criarNotificacaoParaTodos(
 
@@ -1220,6 +1474,18 @@ function updateFullEscala(p) {
 
           ]]);
 
+
+        if (p.louvores_detalhes || p.louvoresDetalhes) {
+          var syncResultado = syncLinkLouvores(
+            ss,
+            p.data,
+            p.louvores_detalhes || p.louvoresDetalhes
+          );
+
+          if (!syncResultado.sucesso) {
+            return syncResultado;
+          }
+        }
 
         criarNotificacaoParaTodos(
 
@@ -4107,6 +4373,38 @@ function criarNotificacaoParaLideres(
 
 
 // ============================================================
+// BUSCAR LINKS DOS LOUVORES
+// ============================================================
+function getLinkLouvores(params) {
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var dataEscala = safeString(
+      params.data || params.dataEscala || params.data_escala
+    ).trim();
+
+    if (!dataEscala) {
+      return {
+        sucesso: false,
+        mensagem: "Data da escala não informada.",
+        louvores: []
+      };
+    }
+
+    return {
+      sucesso: true,
+      mensagem: "Links dos louvores carregados.",
+      louvores: obterLinksLouvoresPorData(ss, dataEscala)
+    };
+  } catch (error) {
+    return {
+      sucesso: false,
+      mensagem: "Erro ao buscar links dos louvores: " + safeErrorMessage(error),
+      louvores: []
+    };
+  }
+}
+
+// ============================================================
 // GET NOTIFICAÇÕES
 // ============================================================
 
@@ -6887,8 +7185,3 @@ function responseJSON(
   }
 
 }
-
-
-// ============================================================
-// FIM DO BACKEND
-// ============================================================
