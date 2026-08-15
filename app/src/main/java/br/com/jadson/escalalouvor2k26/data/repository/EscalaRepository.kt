@@ -56,7 +56,8 @@ class EscalaRepository {
         musicos: String,
         mesario: String,
         louvores: String,
-        uniforme: String
+        uniforme: String,
+        louvoresDetalhes: String? = null
     ): Result<UpdateResponse> = withContext(Dispatchers.IO) {
         try {
             val response = RetrofitClient.instance.updateFullEscala(
@@ -68,7 +69,8 @@ class EscalaRepository {
                 musicos = musicos,
                 mesario = mesario,
                 louvores = louvores,
-                uniforme = uniforme
+                uniforme = uniforme,
+                louvoresDetalhes = louvoresDetalhes
             )
             Result.success(response)
         } catch (e: Exception) {
@@ -86,7 +88,8 @@ class EscalaRepository {
         musicos: String,
         mesario: String,
         louvores: String,
-        uniforme: String
+        uniforme: String,
+        louvoresDetalhes: String? = null
     ): Result<UpdateResponse> = withContext(Dispatchers.IO) {
         try {
             val response = RetrofitClient.instance.createEscala(
@@ -98,7 +101,8 @@ class EscalaRepository {
                 musicos = musicos,
                 mesario = mesario,
                 louvores = louvores,
-                uniforme = uniforme
+                uniforme = uniforme,
+                louvoresDetalhes = louvoresDetalhes
             )
             Result.success(response)
         } catch (e: Exception) {

@@ -52,12 +52,22 @@ class SessionManager(context: Context) {
     }
 
     fun isWelcomeSent(userName: String): Boolean {
-        // Usamos o nome exato para a chave, sem normalização destrutiva
-        return prefs.getBoolean(KEY_WELCOME_SENT_PREFIX + userName, false)
+        val normalized = normalizeName(userName)
+        val key = KEY_WELCOME_SENT_PREFIX + normalized
+        val sent = prefs.getBoolean(key, false)
+        Log.d("NOTIF_WELCOME_DEBUG", "user=$normalized key=$key alreadySent=$sent")
+        return sent
     }
 
     fun setWelcomeSent(userName: String) {
-        prefs.edit().putBoolean(KEY_WELCOME_SENT_PREFIX + userName, true).commit()
+        val normalized = normalizeName(userName)
+        val key = KEY_WELCOME_SENT_PREFIX + normalized
+        prefs.edit().putBoolean(key, true).commit()
+        Log.d("NOTIF_WELCOME_DEBUG", "key=$key persisted=true")
+    }
+
+    private fun normalizeName(name: String): String {
+        return name.trim().lowercase()
     }
 
     fun getUser(): Integrante? {
@@ -72,7 +82,14 @@ class SessionManager(context: Context) {
     }
 
     fun logout() {
-        prefs.edit().clear().apply()
+        prefs.edit().apply {
+            remove(KEY_USER_NAME)
+            remove(KEY_USER_FUNCTION)
+            remove(KEY_USER_PASSWORD)
+            remove(KEY_IS_LOGGED_IN)
+            remove(KEY_LAST_DATA)
+            apply()
+        }
     }
 
     fun saveLastData(dataJson: String) {

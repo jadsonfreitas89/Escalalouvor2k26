@@ -38,7 +38,8 @@ interface EscalaApiService {
         @Query("musicos") musicos: String,
         @Query("mesario") mesario: String,
         @Query("louvores") louvores: String,
-        @Query("uniforme") uniforme: String
+        @Query("uniforme") uniforme: String,
+        @Query("louvores_detalhes") louvoresDetalhes: String? = null
     ): UpdateResponse
 
     @GET("exec")
@@ -52,7 +53,8 @@ interface EscalaApiService {
         @Query("musicos") musicos: String,
         @Query("mesario") mesario: String,
         @Query("louvores") louvores: String,
-        @Query("uniforme") uniforme: String
+        @Query("uniforme") uniforme: String,
+        @Query("louvores_detalhes") louvoresDetalhes: String? = null
     ): UpdateResponse
 
     @GET("exec")

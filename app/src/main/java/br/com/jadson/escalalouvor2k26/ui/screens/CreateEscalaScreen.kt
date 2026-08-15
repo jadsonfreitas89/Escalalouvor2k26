@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import br.com.jadson.escalalouvor2k26.data.model.LouvorItem
 import br.com.jadson.escalalouvor2k26.ui.theme.PrimaryOrange
 import br.com.jadson.escalalouvor2k26.ui.viewmodel.EscalaViewModel
 import br.com.jadson.escalalouvor2k26.ui.viewmodel.UiState
@@ -21,14 +22,16 @@ import br.com.jadson.escalalouvor2k26.ui.viewmodel.UiState
 fun CreateEscalaScreen(navController: androidx.navigation.NavController, viewModel: EscalaViewModel) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     
     var data by remember { mutableStateOf("") }
     var dirigente by remember { mutableStateOf("") }
     var vocal by remember { mutableStateOf("") }
     var musicos by remember { mutableStateOf("") }
     var mesario by remember { mutableStateOf("") }
-    var louvores by remember { mutableStateOf("") }
+    var louvoresResumo by remember { mutableStateOf("") }
     var uniforme by remember { mutableStateOf("") }
+    var praiseItems by remember { mutableStateOf(emptyList<LouvorItem>()) }
 
     val integrantes = if (uiState is UiState.Success) (uiState as UiState.Success).data.integrantes else emptyList()
     
@@ -37,6 +40,10 @@ fun CreateEscalaScreen(navController: androidx.navigation.NavController, viewMod
     val vocalOptions = integrantes.filter { it.funcao.contains("Vocal", ignoreCase = true) || it.funcao.contains("Integrante", ignoreCase = true) }
     val musicosOptions = integrantes.filter { it.funcao.contains("Musico", ignoreCase = true) || it.funcao.contains("Músico", ignoreCase = true) }
     val mesariosOptions = integrantes.filter { it.funcao.contains("Mesário", ignoreCase = true) || it.funcao.contains("Mesario", ignoreCase = true) }
+
+    val isLider = currentUser?.funcao?.uppercase()?.contains("LIDER") == true
+    val isDirigente = currentUser?.funcao?.uppercase()?.contains("DIRIGENTE") == true
+    val canManageLinks = isLider || isDirigente
 
     Scaffold(
         topBar = {
@@ -67,10 +74,21 @@ fun CreateEscalaScreen(navController: androidx.navigation.NavController, viewMod
 
             SingleSelectionField("Mesário:", mesario, mesariosOptions) { mesario = it }
 
-            Text("Louvores:", color = PrimaryOrange, fontWeight = FontWeight.Bold)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
+            
+            PraiseListEditor(
+                praises = praiseItems,
+                isAllowedToEdit = canManageLinks,
+                onPraisesChanged = { list ->
+                    praiseItems = list
+                    louvoresResumo = list.filter { (it.louvor ?: "").isNotBlank() }.joinToString(", ") { it.louvor ?: "" }
+                }
+            )
+
+            Text("Resumo dos Louvores (opcional):", color = PrimaryOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
             OutlinedTextField(
-                value = louvores,
-                onValueChange = { louvores = it },
+                value = louvoresResumo,
+                onValueChange = { louvoresResumo = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ex: Louvor 1, Louvor 2", color = Color.DarkGray) },
                 shape = RoundedCornerShape(12.dp),
@@ -109,27 +127,20 @@ fun CreateEscalaScreen(navController: androidx.navigation.NavController, viewMod
                         Toast.makeText(context, "Selecione um dirigente.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    if (vocal.isBlank()) {
-                        Toast.makeText(context, "Selecione pelo menos um vocal.", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    if (musicos.isBlank()) {
-                        Toast.makeText(context, "Selecione pelo menos um músico.", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    if (mesario.isBlank()) {
-                        Toast.makeText(context, "Selecione um mesário.", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
                     
+                    val louvoresJson = if (praiseItems.isNotEmpty()) {
+                        com.google.gson.Gson().toJson(praiseItems.filter { (it.louvor ?: "").isNotBlank() })
+                    } else null
+
                     viewModel.createEscala(
                         data = data,
                         dirigente = dirigente,
                         vocal = vocal,
                         musicos = musicos,
                         mesario = mesario,
-                        louvores = louvores,
+                        louvores = louvoresResumo,
                         uniforme = uniforme,
+                        louvoresDetalhes = louvoresJson,
                         onSuccess = {
                             Toast.makeText(context, "Escala criada com sucesso.", Toast.LENGTH_SHORT).show()
                             navController.popBackStack()

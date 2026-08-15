@@ -299,6 +299,7 @@ class EscalaViewModel(
         mesario: String,
         louvores: String,
         uniforme: String,
+        louvoresDetalhes: String? = null,
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -319,7 +320,8 @@ class EscalaViewModel(
                 musicos = musicos,
                 mesario = mesario,
                 louvores = louvores,
-                uniforme = uniforme
+                uniforme = uniforme,
+                louvoresDetalhes = louvoresDetalhes
             ).onSuccess { response ->
                 if (response.sucesso) {
                     onSuccess(response.mensagem ?: "Escala atualizada com sucesso.")
@@ -343,6 +345,7 @@ class EscalaViewModel(
         mesario: String,
         louvores: String,
         uniforme: String,
+        louvoresDetalhes: String? = null,
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -363,7 +366,8 @@ class EscalaViewModel(
                 musicos = musicos,
                 mesario = mesario,
                 louvores = louvores,
-                uniforme = uniforme
+                uniforme = uniforme,
+                louvoresDetalhes = louvoresDetalhes
             ).onSuccess { response ->
                 if (response.sucesso) {
                     onSuccess(response.mensagem ?: "Escala criada com sucesso.")
@@ -561,6 +565,61 @@ class EscalaViewModel(
                     else -> "Erro ao atualizar recado: ${error.localizedMessage ?: "Erro de rede"}"
                 }
                 onError(msg)
+            }
+        }
+    }
+
+    fun updateDetailedPraises(
+        data: String,
+        resumo: String,
+        detalhesJson: String,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+        if (user == null) return
+        
+        val isLider = user.funcao.uppercase().contains("LIDER")
+        val isDirigente = user.funcao.uppercase().contains("DIRIGENTE")
+
+        if (!isLider && !isDirigente) {
+            onError("Sem permissão para gerenciar louvores.")
+            return
+        }
+
+        // Obtemos a escala atual para não sobrescrever outros campos com vazio
+        val currentScale = (uiState.value as? UiState.Success)?.data?.escala?.find { it.data == data }
+        if (currentScale == null) {
+            onError("Dados da escala não encontrados localmente.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            repository.updateFullEscala(
+                nome = user.nome,
+                senha = user.senha,
+                data = data.trim(),
+                dirigente = currentScale.dirigente,
+                vocal = currentScale.vocal,
+                musicos = currentScale.musicos,
+                mesario = currentScale.mesario,
+                louvores = resumo,
+                uniforme = currentScale.uniforme,
+                louvoresDetalhes = detalhesJson
+            ).onSuccess { response ->
+                if (response.sucesso) {
+                    // Sincronização Sênior: Limpa cache e recarrega tudo
+                    sessionManager?.saveLastData("")
+                    loadData()
+                    onSuccess(response.mensagem ?: "Louvores e links atualizados!")
+                } else {
+                    _uiState.value = UiState.Idle
+                    onError(response.mensagem ?: "Erro ao atualizar.")
+                }
+            }.onFailure {
+                _uiState.value = UiState.Idle
+                onError("Erro de conexão.")
             }
         }
     }

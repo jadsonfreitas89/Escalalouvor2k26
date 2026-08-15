@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import br.com.jadson.escalalouvor2k26.data.model.LouvorItem
 import br.com.jadson.escalalouvor2k26.ui.components.ErrorScreen
 import br.com.jadson.escalalouvor2k26.ui.components.LoadingScreen
 import br.com.jadson.escalalouvor2k26.ui.theme.PrimaryOrange
@@ -22,6 +23,7 @@ import br.com.jadson.escalalouvor2k26.ui.viewmodel.UiState
 @Composable
 fun EditEscalaScreen(viewModel: EscalaViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     val context = LocalContext.current
     
     var selectedDate by remember { mutableStateOf("") }
@@ -29,16 +31,22 @@ fun EditEscalaScreen(viewModel: EscalaViewModel) {
     var vocal by remember { mutableStateOf("") }
     var musicos by remember { mutableStateOf("") }
     var mesario by remember { mutableStateOf("") }
-    var louvores by remember { mutableStateOf("") }
+    var louvoresResumo by remember { mutableStateOf("") }
     var uniforme by remember { mutableStateOf("") }
+    var praiseItems by remember { mutableStateOf(emptyList<LouvorItem>()) }
 
     val integrantes = if (uiState is UiState.Success) (uiState as UiState.Success).data.integrantes else emptyList()
+    val allPraiseItems = if (uiState is UiState.Success) (uiState as UiState.Success).data.linkLouvores else emptyList()
     
     // Filtros por função
     val dirigentesOptions = integrantes.filter { it.funcao.contains("Dirigente", ignoreCase = true) || it.funcao.contains("Lider", ignoreCase = true) }
     val vocalOptions = integrantes.filter { it.funcao.contains("Vocal", ignoreCase = true) || it.funcao.contains("Integrante", ignoreCase = true) }
     val musicosOptions = integrantes.filter { it.funcao.contains("Musico", ignoreCase = true) || it.funcao.contains("Músico", ignoreCase = true) }
     val mesariosOptions = integrantes.filter { it.funcao.contains("Mesário", ignoreCase = true) || it.funcao.contains("Mesario", ignoreCase = true) }
+
+    val isLider = currentUser?.funcao?.uppercase()?.contains("LIDER") == true
+    val isDirigente = currentUser?.funcao?.uppercase()?.contains("DIRIGENTE") == true
+    val canManageLinks = isLider || isDirigente
 
     Scaffold(
         topBar = {
@@ -88,8 +96,22 @@ fun EditEscalaScreen(viewModel: EscalaViewModel) {
                                             vocal = escala.vocal
                                             musicos = escala.musicos
                                             mesario = escala.mesario
-                                            louvores = escala.louvores
+                                            louvoresResumo = escala.louvores
                                             uniforme = escala.uniforme
+                                            
+                                            // Importar Louvores
+                                            val details = allPraiseItems.filter { it.dataEscala == escala.data }
+                                            if (details.isNotEmpty()) {
+                                                praiseItems = details.sortedBy { it.ordem }
+                                            } else if (escala.louvores.isNotBlank()) {
+                                                // Se não tem detalhes, tenta importar do resumo
+                                                praiseItems = escala.louvores.split(",").mapIndexed { index, s ->
+                                                    LouvorItem(dataEscala = escala.data, ordem = index + 1, louvor = s.trim())
+                                                }
+                                            } else {
+                                                praiseItems = emptyList()
+                                            }
+                                            
                                             expanded = false
                                         }
                                     )
@@ -106,10 +128,23 @@ fun EditEscalaScreen(viewModel: EscalaViewModel) {
 
                             SingleSelectionField("Mesário:", mesario, mesariosOptions) { mesario = it }
 
-                            Text("Louvores:", color = PrimaryOrange, fontWeight = FontWeight.Bold)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
+
+                            // EDITOR DE LOUVORES
+                            PraiseListEditor(
+                                praises = praiseItems,
+                                isAllowedToEdit = canManageLinks,
+                                onPraisesChanged = { list ->
+                                    praiseItems = list
+                                    // Atualiza o resumo automaticamente para manter consistência
+                                    louvoresResumo = list.filter { (it.louvor ?: "").isNotBlank() }.joinToString(", ") { it.louvor ?: "" }
+                                }
+                            )
+
+                            Text("Resumo dos Louvores (opcional):", color = PrimaryOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                             OutlinedTextField(
-                                value = louvores,
-                                onValueChange = { louvores = it },
+                                value = louvoresResumo,
+                                onValueChange = { louvoresResumo = it },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -143,14 +178,19 @@ fun EditEscalaScreen(viewModel: EscalaViewModel) {
                                         return@Button
                                     }
                                     
+                                    val louvoresJson = if (praiseItems.isNotEmpty()) {
+                                        com.google.gson.Gson().toJson(praiseItems.filter { (it.louvor ?: "").isNotBlank() })
+                                    } else null
+
                                     viewModel.updateFullEscala(
                                         data = selectedDate,
                                         dirigente = dirigente,
                                         vocal = vocal,
                                         musicos = musicos,
                                         mesario = mesario,
-                                        louvores = louvores,
+                                        louvores = louvoresResumo,
                                         uniforme = uniforme,
+                                        louvoresDetalhes = louvoresJson,
                                         onSuccess = { 
                                             Toast.makeText(context, "Escala atualizada com sucesso.", Toast.LENGTH_SHORT).show()
                                         },

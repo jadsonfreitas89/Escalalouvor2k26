@@ -80,22 +80,27 @@ class NotificationWorker(
     }
 
     private fun checkAndSendWelcome(userName: String) {
-        if (!sessionManager.isWelcomeSent(userName)) {
-            Log.d("NOTIF_WORKER_DEBUG", "ENVIANDO BOAS-VINDAS PARA $userName")
-            val title = "🎵 Bem-vindo ao Escala de Louvor 2K26"
-            val message = "Olá, $userName!\n\nSeja bem-vindo ao aplicativo Escala de Louvor 2K26. Que Deus abençoe seu serviço! 🙏"
-            
-            try {
-                NotificationHelper.showNotification(
+        synchronized(this) {
+            if (!sessionManager.isWelcomeSent(userName)) {
+                Log.d("NOTIF_WELCOME_DEBUG", "user=$userName alreadySent=false action=SEND")
+                val title = "🎵 Bem-vindo ao Escala de Louvor 2K26"
+                val message = "Olá, $userName!\n\nSeja bem-vindo ao aplicativo Escala de Louvor 2K26. Que Deus abençoe seu serviço! 🙏"
+                
+                val success = NotificationHelper.showNotification(
                     context = applicationContext, 
                     id = 1000, 
                     title = title, 
                     message = message,
                     type = NotificationHelper.TYPE_BOAS_VINDAS
                 )
-                sessionManager.setWelcomeSent(userName)
-            } catch (e: Exception) {
-                Log.e("NOTIF_WORKER_DEBUG", "Erro ao enviar boas-vindas: ${e.message}")
+                
+                if (success) {
+                    sessionManager.setWelcomeSent(userName)
+                } else {
+                    Log.e("NOTIF_WELCOME_DEBUG", "Falha ao disparar notificação. Tentará novamente na próxima execução.")
+                }
+            } else {
+                Log.d("NOTIF_WELCOME_DEBUG", "user=$userName alreadySent=true action=SKIP")
             }
         }
     }

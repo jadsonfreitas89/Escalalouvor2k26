@@ -11,6 +11,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -419,6 +422,30 @@ fun EscalaItemCard(
                 .replace("\n", ", ")
             
             InfoRowLocal("Músicos", if (musicosFormatados.isBlank()) escala.musicos else musicosFormatados)
+
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Button(
+                onClick = { showDetails = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = PrimaryOrange,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "VER LOUVORES E LINKS",
+                    color = PrimaryOrange,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

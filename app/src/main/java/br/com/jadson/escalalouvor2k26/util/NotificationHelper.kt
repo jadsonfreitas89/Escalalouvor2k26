@@ -49,7 +49,7 @@ object NotificationHelper {
         message: String,
         type: String = TYPE_BOAS_VINDAS,
         referenceId: String? = null
-    ) {
+    ): Boolean {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra(EXTRA_TYPE, type)
@@ -70,15 +70,18 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
 
-        with(NotificationManagerCompat.from(context)) {
-            try {
+        return try {
+            with(NotificationManagerCompat.from(context)) {
                 Log.d("NOTIF_HELPER", "Exibindo notificação ID: $id, Tipo: $type")
                 notify(id, builder.build())
-            } catch (e: SecurityException) {
-                Log.e("NOTIF_HELPER", "ERRO SECURITY = ${e.message}")
-            } catch (e: Exception) {
-                Log.e("NOTIF_HELPER", "ERRO NOTIFY = ${e.message}")
+                true
             }
+        } catch (e: SecurityException) {
+            Log.e("NOTIF_HELPER", "ERRO SECURITY = ${e.message}")
+            false
+        } catch (e: Exception) {
+            Log.e("NOTIF_HELPER", "ERRO NOTIFY = ${e.message}")
+            false
         }
     }
 }
