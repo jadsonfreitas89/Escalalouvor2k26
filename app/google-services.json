@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "79721291343",
+    "project_id": "escala-louvor-1448f",
+    "storage_bucket": "escala-louvor-1448f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79721291343:android:0bcc858a691a696b8cd43a",
+        "android_client_info": {
+          "package_name": "br.com.jadson.escalalouvor2k26"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdfdPJRkxVkvpRGPO7HaE09ilZqNaxaiA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

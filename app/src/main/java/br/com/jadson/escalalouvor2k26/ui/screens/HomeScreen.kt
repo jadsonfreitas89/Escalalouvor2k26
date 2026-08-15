@@ -42,9 +42,19 @@ fun HomeScreen(navController: NavController, viewModel: EscalaViewModel) {
     val notifications by viewModel.notificacoes.collectAsState()
     val isLider = currentUser?.funcao?.uppercase()?.contains("LIDER") == true
 
-    LaunchedEffect(currentUser) {
-        if (currentUser != null) {
-            viewModel.carregarNotificacoes()
+    // Observador de Ciclo de Vida para busca imediata ao voltar para o app (ON_RESUME)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                if (currentUser != null) {
+                    viewModel.carregarNotificacoes()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -120,21 +130,25 @@ fun HomeScreen(navController: NavController, viewModel: EscalaViewModel) {
                 is UiState.Loading -> LoadingScreen()
                 is UiState.Error -> ErrorScreen(state.message) { viewModel.loadData() }
                 is UiState.Success -> {
-                    val allFutureEscalas = state.data.escala
-                        .mapNotNull { escala ->
-                            try {
-                                escala to LocalDate.parse(escala.data, dateFormatter)
-                            } catch (e: Exception) {
-                                null
+                    val allFutureEscalas = remember(state.data.escala, today) {
+                        state.data.escala
+                            .mapNotNull { escala ->
+                                try {
+                                    escala to LocalDate.parse(escala.data, dateFormatter)
+                                } catch (e: Exception) {
+                                    null
+                                }
                             }
-                        }
-                        .filter { (_, date) -> !date.isBefore(today) }
-                        .sortedBy { it.second }
-
-                    val myNextEscalaEntry = allFutureEscalas.firstOrNull { (escala, _) ->
-                        getMyRole(escala, currentUser?.nome) != null
+                            .filter { (_, date) -> !date.isBefore(today) }
+                            .sortedBy { it.second }
                     }
-                    val generalNextEscalaEntry = allFutureEscalas.firstOrNull()
+
+                    val myNextEscalaEntry = remember(allFutureEscalas, currentUser?.nome) {
+                        allFutureEscalas.firstOrNull { (escala, _) ->
+                            getMyRole(escala, currentUser?.nome) != null
+                        }
+                    }
+                    val generalNextEscalaEntry = remember(allFutureEscalas) { allFutureEscalas.firstOrNull() }
 
                     if (showNextEscalaDialog && selectedEscalaForDialog != null) {
                         NextEscalaDialog(

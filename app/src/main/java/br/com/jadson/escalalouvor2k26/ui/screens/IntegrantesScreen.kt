@@ -49,7 +49,7 @@ fun IntegrantesScreen(viewModel: EscalaViewModel) {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(state.data.integrantes) { integrante ->
+                        items(state.data.integrantes, key = { it.nome }) { integrante ->
                             IntegranteItem(integrante)
                         }
                     }

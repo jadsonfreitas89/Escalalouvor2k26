@@ -4244,6 +4244,9 @@ function criarNotificacaoParaTodos(
   tipo
 ) {
 
+  var inicio = Date.now();
+  Logger.log("[PERF] criarNotificacaoParaTodos INICIO");
+
   var integrantes =
     getSheetData(
       ss,
@@ -4251,47 +4254,23 @@ function criarNotificacaoParaTodos(
       mapIntegrante
     );
 
+  var nomes = integrantes.map(function(i) {
+    return safeString(i.nome).trim();
+  }).filter(function(n) {
+    return n !== "";
+  });
 
-  var quantidade =
-    0;
+  var count = criarNotificacoesEmLote(
+    ss,
+    nomes,
+    titulo,
+    mensagem,
+    tipo
+  );
 
+  Logger.log("[PERF] criarNotificacaoParaTodos FIM. Tempo: " + (Date.now() - inicio) + "ms. Destinatários: " + nomes.length);
 
-  for (
-    var i = 0;
-    i < integrantes.length;
-    i++
-  ) {
-
-    var nome =
-      safeString(
-        integrantes[i].nome
-      ).trim();
-
-
-    if (!nome) {
-      continue;
-    }
-
-
-    if (
-      criarNotificacao(
-        ss,
-        nome,
-        titulo,
-        mensagem,
-        tipo
-      )
-    ) {
-
-      quantidade++;
-
-    }
-
-  }
-
-
-  return quantidade;
-
+  return count;
 }
 
 
@@ -4306,6 +4285,9 @@ function criarNotificacaoParaLideres(
   tipo
 ) {
 
+  var inicio = Date.now();
+  Logger.log("[PERF] criarNotificacaoParaLideres INICIO");
+
   var integrantes =
     getSheetData(
       ss,
@@ -4313,10 +4295,7 @@ function criarNotificacaoParaLideres(
       mapIntegrante
     );
 
-
-  var quantidade =
-    0;
-
+  var nomesLideres = [];
 
   for (
     var i = 0;
@@ -4329,46 +4308,113 @@ function criarNotificacaoParaLideres(
         integrantes[i].funcao
       );
 
-
     if (
-      funcao.indexOf("lider") === -1
+      funcao.indexOf("lider") !== -1
     ) {
-
-      continue;
-
+      var nome = safeString(integrantes[i].nome).trim();
+      if (nome) {
+        nomesLideres.push(nome);
+      }
     }
-
-
-    var nome =
-      safeString(
-        integrantes[i].nome
-      ).trim();
-
-
-    if (!nome) {
-      continue;
-    }
-
-
-    if (
-      criarNotificacao(
-        ss,
-        nome,
-        titulo,
-        mensagem,
-        tipo
-      )
-    ) {
-
-      quantidade++;
-
-    }
-
   }
 
+  var count = criarNotificacoesEmLote(
+    ss,
+    nomesLideres,
+    titulo,
+    mensagem,
+    tipo
+  );
 
-  return quantidade;
+  Logger.log("[PERF] criarNotificacaoParaLideres FIM. Tempo: " + (Date.now() - inicio) + "ms. Lideres: " + nomesLideres.length);
 
+  return count;
+}
+
+// ============================================================
+// CRIAR NOTIFICAÇÕES EM LOTE (BATCH)
+// ============================================================
+
+function criarNotificacoesEmLote(
+  ss,
+  destinatarios,
+  titulo,
+  mensagem,
+  tipo
+) {
+
+  if (!destinatarios || destinatarios.length === 0) {
+    return 0;
+  }
+
+  var lock = LockService.getScriptLock();
+
+  try {
+    // Pedimos o lock apenas uma vez para o lote inteiro
+    lock.waitLock(15000);
+
+    var sheet = obterAbaNotificacoes(ss);
+    var headers = obterCabecalhosNotificacao(sheet);
+    var colCount = sheet.getLastColumn();
+
+    // Pegamos dados recentes para checar duplicidade apenas uma vez
+    var values = sheet.getDataRange().getValues();
+    var colDest = headers.indexOf("destinatario");
+    var colTit = headers.indexOf("titulo");
+    var colMsg = headers.indexOf("mensagem");
+
+    var rowsToWrite = [];
+    var now = new Date();
+
+    for (var i = 0; i < destinatarios.length; i++) {
+      var dest = destinatarios[i];
+
+      // Checagem de duplicidade em memória contra dados existentes
+      var isDup = false;
+      var checkLimit = Math.max(1, values.length - 20);
+
+      for (var j = values.length - 1; j >= checkLimit; j--) {
+        if (normalizarTexto(values[j][colDest]) === normalizarTexto(dest) &&
+            safeString(values[j][colTit]).trim() === safeString(titulo).trim() &&
+            safeString(values[j][colMsg]).trim() === safeString(mensagem).trim()) {
+          isDup = true;
+          break;
+        }
+      }
+
+      if (!isDup) {
+        var newRow = new Array(colCount).fill("");
+
+        definirValorColuna(newRow, headers, "id", Utilities.getUuid());
+        definirValorColuna(newRow, headers, "destinatario", dest);
+        definirValorColuna(newRow, headers, "titulo", titulo);
+        definirValorColuna(newRow, headers, "mensagem", mensagem);
+        definirValorColuna(newRow, headers, "tipo", tipo);
+        definirValorColuna(newRow, headers, "data", now);
+        definirValorColuna(newRow, headers, "lida", "NAO");
+
+        rowsToWrite.push(newRow);
+      }
+    }
+
+    if (rowsToWrite.length > 0) {
+      // Escrita ÚNICA em lote
+      sheet.getRange(
+        sheet.getLastRow() + 1,
+        1,
+        rowsToWrite.length,
+        colCount
+      ).setValues(rowsToWrite);
+    }
+
+    return rowsToWrite.length;
+
+  } catch (error) {
+    Logger.log("Erro no batch de notificações: " + error);
+    return 0;
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
 }
 
 

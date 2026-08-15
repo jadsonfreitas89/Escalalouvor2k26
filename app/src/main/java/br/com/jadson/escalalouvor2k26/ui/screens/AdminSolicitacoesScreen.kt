@@ -57,7 +57,7 @@ fun AdminSolicitacoesScreen(viewModel: EscalaViewModel) {
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            items(solicitacoes) { solicitacao ->
+                            items(solicitacoes, key = { it.id }) { solicitacao ->
                                 AdminSolicitacaoCard(
                                     solicitacao = solicitacao,
                                     onAuthorize = {

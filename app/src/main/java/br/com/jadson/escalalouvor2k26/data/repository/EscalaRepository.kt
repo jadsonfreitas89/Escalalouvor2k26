@@ -259,4 +259,16 @@ class EscalaRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun atualizarTokenFcm(nome: String, senha: String, token: String): Result<UpdateResponse> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("FCM_TOKEN", "Enviando token para servidor: Usuario=$nome")
+            val response = RetrofitClient.instance.atualizarTokenFcm(nome = nome, senha = senha, token = token)
+            Log.d("FCM_TOKEN", "Resposta do servidor: sucesso=${response.sucesso}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Log.e("FCM_TOKEN", "ERRO AO ATUALIZAR TOKEN FCM: Erro=${e.localizedMessage}")
+            Result.failure(e)
+        }
+    }
 }

@@ -1,0 +1,66 @@
+============================================================
+       OVERVIEW GERAL: ESCALA LOUVOR 2K26
+============================================================
+
+O Escala Louvor 2k26 é um ecossistema Android integrado ao Google Sheets para gestão de equipes de louvor, escalas de culto, solicitações de troca, recados com imagem e links multimídia (YouTube).
+
+1. COMO INSTALAR (DESENVOLVEDOR)
+------------------------------------------------------------
+- Pré-requisitos: Android Studio Jellyfish ou superior, Java 17+.
+- Clone o projeto e abra no Android Studio.
+- Aguarde o Gradle Sync terminar.
+- Conecte um dispositivo Android ou emulador.
+- Clique em 'Run' (ícone verde de play) para compilar e instalar o APK de debug.
+- O app utiliza Retrofit para comunicação com uma API baseada em Google Apps Script.
+
+2. COMO INSTALAR (USUÁRIO FINAL)
+------------------------------------------------------------
+- Obtenha o arquivo APK gerado pelo administrador.
+- No celular, habilite a instalação de "Fontes Desconhecidas" nas configurações.
+- Abra o arquivo APK e clique em "Instalar".
+- Após a instalação, abra o app "Escala Louvor 2k26".
+
+3. COMO USAR O APLICATIVO
+------------------------------------------------------------
+A. LOGIN:
+   - Digite seu nome (exatamente como consta na planilha de Integrantes).
+   - Digite sua senha pessoal.
+   - O app diferencia permissões entre LÍDER, DIRIGENTE e INTEGRANTE.
+
+B. VISUALIZAÇÃO DA ESCALA:
+   - A tela principal mostra a escala completa.
+   - A aba "Próximos" destaca os cultos iminentes.
+   - Se você estiver escalado, aparecerá um aviso dourado "VOCÊ ESTÁ ESCALADO".
+
+C. LINKS DO YOUTUBE (NOVIDADE):
+   - Em cada card de escala, clique no botão "VER LOUVORES E LINKS".
+   - Uma janela se abrirá com a lista de músicas do dia.
+   - Músicas com link cadastrado exibirão o botão laranja "Ver no YouTube".
+   - Clique no botão para abrir o vídeo diretamente no app do YouTube.
+
+D. SOLICITAÇÃO DE TROCA:
+   - Não poderá ir ao culto? Abra os detalhes da escala e clique em "Solicitar Troca".
+   - Escolha um substituto da lista (o app filtra apenas pessoas da mesma função).
+   - O Líder receberá a notificação e poderá aprovar ou recusar a troca.
+
+E. RECADOS:
+   - Visualize comunicados importantes na aba de Recados.
+   - Recados podem conter fotos ampliáveis ao clicar.
+
+F. GESTÃO (APENAS LÍDER/DIRIGENTE):
+   - Clique no ícone de engrenagem ou "Editar Escala" para alterar campos.
+   - Para gerenciar links: Entre nos detalhes da escala, clique em "Editar" na seção de Louvores e insira o nome da música + link do YouTube.
+
+4. ESTRUTURA DE DADOS (GOOGLE SHEETS)
+------------------------------------------------------------
+O app lê e grava dados nas abas:
+- ESCALA: Dados gerais do culto.
+- INTEGRANTES: Nomes, senhas e funções.
+- LINK_LOUVORES: Vínculo de vídeos do YouTube (Coluna DATA_ESCALA).
+- SOLICITACOES: Histórico de trocas.
+- RECADOS: Comunicados gerais.
+
+============================================================
+Suporte Técnico: Desenvolvido via Android Studio AI Assistant
+Versão: 2.0.26 - Bugfix YouTube Links (Build 14/08/2026)
+============================================================

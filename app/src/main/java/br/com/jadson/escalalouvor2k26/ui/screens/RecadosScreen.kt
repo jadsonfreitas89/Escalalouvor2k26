@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -54,7 +55,9 @@ fun RecadosScreen(navController: NavController, viewModel: EscalaViewModel) {
                 is UiState.Loading -> LoadingScreen()
                 is UiState.Error -> ErrorScreen(state.message) { viewModel.loadData() }
                 is UiState.Success -> {
-                    val activeRecados = state.data.recados.filter { it.ativo.uppercase() == "SIM" }
+                    val activeRecados = remember(state.data.recados) {
+                        state.data.recados.filter { it.ativo.uppercase() == "SIM" }
+                    }
                     
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -83,7 +86,7 @@ fun RecadosScreen(navController: NavController, viewModel: EscalaViewModel) {
                                 }
                             }
                         } else {
-                            items(activeRecados) { recado ->
+                            items(activeRecados, key = { it.id }) { recado ->
                                 RecadoCard(
                                     recado = recado,
                                     isLider = isLider,

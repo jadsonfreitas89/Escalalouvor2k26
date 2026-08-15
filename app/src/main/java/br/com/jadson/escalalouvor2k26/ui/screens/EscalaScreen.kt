@@ -91,16 +91,25 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                 is UiState.Error -> ErrorScreen(state.message) { viewModel.loadData() }
                 is UiState.Success -> {
                     if (selectedTab == 0) {
-                        val allEscalas = state.data.escala.mapNotNull { escala ->
-                            try {
-                                escala to LocalDate.parse(escala.data, dateFormatter)
-                            } catch (e: Exception) {
-                                null
-                            }
+                        val proximas = remember(state.data.escala, today) {
+                            state.data.escala.mapNotNull { escala ->
+                                try {
+                                    escala to LocalDate.parse(escala.data, dateFormatter)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }.filter { !it.second.isBefore(today) }.sortedBy { it.second }
                         }
 
-                        val proximas = allEscalas.filter { !it.second.isBefore(today) }.sortedBy { it.second }
-                        val anteriores = allEscalas.filter { it.second.isBefore(today) }.sortedByDescending { it.second }
+                        val anteriores = remember(state.data.escala, today) {
+                            state.data.escala.mapNotNull { escala ->
+                                try {
+                                    escala to LocalDate.parse(escala.data, dateFormatter)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }.filter { it.second.isBefore(today) }.sortedByDescending { it.second }
+                        }
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -143,7 +152,7 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
 
                             if (proximas.isNotEmpty()) {
                                 item { SectionHeader("PRÓXIMAS") }
-                                items(proximas) { (escala, _) ->
+                                items(proximas, key = { it.first.data }) { (escala, _) ->
                                     EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = true, integrantes = integrantes)
                                 }
                             }
@@ -153,7 +162,7 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                                     Spacer(modifier = Modifier.height(16.dp))
                                     SectionHeader("ANTERIORES")
                                 }
-                                items(anteriores) { (escala, _) ->
+                                items(anteriores, key = { it.first.data }) { (escala, _) ->
                                     EscalaItemCard(escala, currentUser?.nome, viewModel, isProxima = false, integrantes = integrantes)
                                 }
                             }
@@ -172,7 +181,7 @@ fun EscalaScreen(navController: NavController, viewModel: EscalaViewModel) {
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                items(solicitacoes) { solicitacao ->
+                                items(solicitacoes, key = { it.id }) { solicitacao ->
                                     SolicitacaoTrocaCard(
                                         solicitacao = solicitacao,
                                         isLider = isLider,
@@ -417,9 +426,11 @@ fun EscalaItemCard(
             InfoRowLocal("Dirigente", escala.dirigente)
             InfoRowLocal("Vocal", escala.vocal)
             
-            val musicosFormatados = formatMusiciansWithInstrument(escala.musicos, integrantes)
-                .replace("• ", "")
-                .replace("\n", ", ")
+            val musicosFormatados = remember(escala.musicos, integrantes) {
+                formatMusiciansWithInstrument(escala.musicos, integrantes)
+                    .replace("• ", "")
+                    .replace("\n", ", ")
+            }
             
             InfoRowLocal("Músicos", if (musicosFormatados.isBlank()) escala.musicos else musicosFormatados)
 

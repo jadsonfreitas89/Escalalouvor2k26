@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -52,6 +53,12 @@ dependencies {
     implementation(libs.retrofit.gson)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.fragment.ktx)
+    
+    // Firebase BoM e Cloud Messaging
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging.ktx)
+
     implementation(libs.coil.compose)
     implementation(libs.coil.network)
     testImplementation(libs.junit)

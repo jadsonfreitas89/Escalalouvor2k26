@@ -53,7 +53,6 @@ class EscalaViewModel(
 
     init {
         loadData()
-        carregarNotificacoes()
     }
 
     fun checkWorkerStatus(context: Context) {
@@ -180,6 +179,19 @@ class EscalaViewModel(
                     if (user != null) {
                         sessionManager?.saveSession(user)
                         _currentUser.value = user
+                        
+                        // Capturar e enviar token FCM após login de sucesso
+                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val token = task.result
+                                viewModelScope.launch {
+                                    repository.atualizarTokenFcm(user.nome, user.senha, token)
+                                }
+                            } else {
+                                Log.e("FCM_TOKEN", "Falha ao obter token FCM no login", task.exception)
+                            }
+                        }
+
                         _uiState.value = UiState.Success(data)
                         carregarNotificacoes() // Carregar notificações imediatamente após login
                         onSuccess()

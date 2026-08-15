@@ -42,22 +42,24 @@ fun NextEscalaDialog(
     val integrantes = if (uiState is UiState.Success) (uiState as UiState.Success).data.integrantes else emptyList()
     
     // Normalização rigorosa e limpeza de caracteres não imprimíveis (Senior Fix)
-    val cleanDataEscala = escala.data.trim().replace(Regex("[^0-9/]"), "")
+    val cleanDataEscala = remember(escala.data) { escala.data.trim().replace(Regex("[^0-9/]"), "") }
     
     val allLinks = (uiState as? UiState.Success)?.data?.linkLouvores ?: emptyList()
-    val detailedPraises = allLinks.filter { 
-        // Correção Final: O Logcat provou que a data vem no campo 'data' e não em 'dataEscala'
-        val rawData = if (!it.data.isNullOrBlank()) it.data else (it.dataEscala ?: "")
-        
-        // Normalização Inteligente
-        val cleanItemData = rawData.trim().replace(Regex("[^0-9/]"), "")
-        val normalizedItemData = if (cleanItemData.length == 8 && cleanItemData.count { c -> c == '/' } == 2) {
-            val parts = cleanItemData.split("/")
-            "${parts[0]}/${parts[1]}/20${parts[2]}"
-        } else cleanItemData
-        
-        normalizedItemData == cleanDataEscala 
-    }.sortedBy { it.ordem ?: 0 }
+    val detailedPraises = remember(allLinks, cleanDataEscala) {
+        allLinks.filter { 
+            // Correção Final: O Logcat provou que a data vem no campo 'data' e não em 'dataEscala'
+            val rawData = if (!it.data.isNullOrBlank()) it.data else (it.dataEscala ?: "")
+            
+            // Normalização Inteligente
+            val cleanItemData = rawData.trim().replace(Regex("[^0-9/]"), "")
+            val normalizedItemData = if (cleanItemData.length == 8 && cleanItemData.count { c -> c == '/' } == 2) {
+                val parts = cleanItemData.split("/")
+                "${parts[0]}/${parts[1]}/20${parts[2]}"
+            } else cleanItemData
+            
+            normalizedItemData == cleanDataEscala 
+        }.sortedBy { it.ordem ?: 0 }
+    }
 
     // Log para depuração sênior (Ajustado para o novo diagnóstico)
     LaunchedEffect(uiState, cleanDataEscala) {
@@ -198,7 +200,9 @@ fun NextEscalaDialog(
                     InfoRowEditable(label = "Vocal", value = escala.vocal, hasEditPermission = isLider, onEdit = { fieldToEdit = "vocal"; initialValue = escala.vocal; showEditDialog = true })
                     
                     // MÚSICOS (Líder pode editar)
-                    val musicosComInstrumento = formatMusiciansWithInstrument(escala.musicos, integrantes)
+                    val musicosComInstrumento = remember(escala.musicos, integrantes) { 
+                        formatMusiciansWithInstrument(escala.musicos, integrantes) 
+                    }
                     InfoRowEditable(label = "Músicos", value = musicosComInstrumento, hasEditPermission = isLider, onEdit = { fieldToEdit = "musicos"; initialValue = escala.musicos; showEditDialog = true })
                     
                     // MESÁRIO (Líder pode editar)

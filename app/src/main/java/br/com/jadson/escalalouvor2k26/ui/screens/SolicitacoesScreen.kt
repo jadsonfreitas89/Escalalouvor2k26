@@ -46,7 +46,7 @@ fun SolicitacoesScreen(viewModel: EscalaViewModel) {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(state.data.solicitacoes) { solicitacao ->
+                        items(state.data.solicitacoes, key = { it.id }) { solicitacao ->
                             SolicitacaoCard(solicitacao)
                         }
                     }

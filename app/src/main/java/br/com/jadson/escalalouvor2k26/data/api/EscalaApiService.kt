@@ -125,4 +125,12 @@ interface EscalaApiService {
         @Query("nome") nome: String,
         @Query("senha") senha: String
     ): UpdateResponse
+
+    @GET("exec")
+    suspend fun atualizarTokenFcm(
+        @Query("action") action: String = "atualizarTokenFcm",
+        @Query("nome") nome: String,
+        @Query("senha") senha: String,
+        @Query("token") token: String
+    ): UpdateResponse
 }
