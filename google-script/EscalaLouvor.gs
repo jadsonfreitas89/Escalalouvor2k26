@@ -1,615 +1,6894 @@
-/**
- * Escala Louvor 2k26 - Google Apps Script Backend
- * Suporta requisições GET e POST para criação e edição de recados com imagem,
- * gestão de escalas e solicitações de troca.
- */
+// ============================================================
+// ESCALA DE LOUVOR 2K26
+// GOOGLE APPS SCRIPT - BACKEND ÚNICO
+// ============================================================
+//
+// Backend único e consolidado.
+//
+// Compatível com:
+// br.com.jadson.escalalouvor2k26.data.repository.EscalaRepository
+//
+// FUNCIONALIDADES:
+//
+// - ESCALA
+// - INTEGRANTES
+// - SOLICITAÇÕES
+// - RECADOS
+// - GOOGLE DRIVE
+// - NOTIFICAÇÕES
+//
+// NOTIFICAÇÕES:
+//
+// - Criar para usuário
+// - Criar para todos
+// - Criar para líderes
+// - Buscar notificações
+// - Marcar uma como lida
+// - Marcar todas como lidas
+// - Excluir uma
+// - Limpar todas as lidas
+// - Proteção contra duplicação
+//
+// ============================================================
+
+
+// ============================================================
+// CONFIGURAÇÕES
+// ============================================================
+
+var SPREADSHEET_ID =
+  "1gUSw3B--ysm8xhhtIvAiV1e8tbrMb7q394QUU13G-F0";
+
+var FOLDER_ID =
+  "1nJ1TiTpJSDknAfxWbtotdiOshJ0rZFCe";
+
+var ABA_ESCALA = "ESCALA";
+var ABA_INTEGRANTES = "INTEGRANTES";
+var ABA_SOLICITACOES = "SOLICITAÇÕES";
+var ABA_RECADOS = "RECADOS";
+var ABA_NOTIFICACOES = "NOTIFICACOES";
+
+
+// ============================================================
+// GET
+// ============================================================
 
 function doGet(e) {
   return handleRequest(e);
 }
 
+
+// ============================================================
+// POST
+// ============================================================
+
 function doPost(e) {
   return handleRequest(e);
 }
 
-/**
- * Centraliza o processamento das requisições e garante resposta JSON consistente.
- */
+
+// ============================================================
+// PROCESSADOR CENTRAL
+// ============================================================
+
 function handleRequest(e) {
+
   var response = {
     sucesso: false,
     mensagem: "Erro inesperado no servidor."
   };
 
   try {
-    var params = e.parameter;
-    var action = params.action;
+
+    e = e || {};
+
+    var params = e.parameter || {};
+
+    var action =
+      safeString(params.action)
+        .trim();
+
+
+    // --------------------------------------------------------
+    // SEM ACTION
+    // --------------------------------------------------------
 
     if (!action) {
-      response.mensagem = "Ação não especificada.";
-      return createJsonResponse(response);
+
+      response =
+        getEscalaData(params);
+
+      return responseJSON(response);
+
     }
 
-    // Roteamento de ações
-    if (action === "getEscalaData") {
-      response = getEscalaDataAction(params);
-    } else if (action === "createRecado") {
-      response = createRecadoAction(params);
-    } else if (action === "updateRecado") {
-      response = updateRecadoAction(params);
-    } else if (action === "deleteRecado") {
-      response = deleteRecadoAction(params);
-    } else if (action === "createEscala") {
-      response = createEscalaAction(params);
-    } else if (action === "updateEscala") {
-      response = updateEscalaAction(params);
-    } else if (action === "updateFullEscala") {
-      response = updateFullEscalaAction(params);
-    } else if (action === "createSolicitacao") {
-      response = createSolicitacaoAction(params);
-    } else if (action === "processaSolicitacao") {
-      response = processaSolicitacaoAction(params);
-    } else if (action === "getNotificacoes") {
-      response = getNotificacoesAction(params);
-    } else if (action === "marcarNotificacaoComoLida") {
-      response = marcarNotificacaoComoLidaAction(params);
-    } else if (action === "updateSolicitacao") {
-      response = updateSolicitacaoOldAction(params); // Mantendo compatibilidade se necessário
-    } else {
-      response.mensagem = "Ação '" + action + "' não implementada.";
+
+    // --------------------------------------------------------
+    // ROTEAMENTO
+    // --------------------------------------------------------
+
+    switch (action) {
+
+      // ======================================================
+      // DADOS
+      // ======================================================
+
+      case "getEscalaData":
+
+        response =
+          getEscalaData(params);
+
+        break;
+
+
+      // ======================================================
+      // NOTIFICAÇÕES
+      // ======================================================
+
+      case "getNotificacoes":
+
+        response =
+          getNotificacoes(params);
+
+        break;
+
+
+      case "marcarNotificacaoLida":
+
+        response =
+          marcarNotificacaoLida(params);
+
+        break;
+
+
+      // Compatibilidade com possível nome usado
+      // por versões anteriores do aplicativo.
+
+      case "marcarNotificacaoComoLida":
+
+        response =
+          marcarNotificacaoLida(params);
+
+        break;
+
+
+      case "marcarTodasNotificacoesLidas":
+
+        response =
+          marcarTodasNotificacoesLidas(params);
+
+        break;
+
+
+      case "deleteNotificacao":
+
+        response =
+          deleteNotificacao(params);
+
+        break;
+
+
+      case "limparNotificacoesLidas":
+
+        response =
+          limparNotificacoesLidas(params);
+
+        break;
+
+
+      // ======================================================
+      // RECADOS
+      // ======================================================
+
+      case "createRecado":
+
+        response =
+          createRecado(params);
+
+        break;
+
+
+      case "updateRecado":
+
+        response =
+          updateRecado(params);
+
+        break;
+
+
+      case "deleteRecado":
+
+        response =
+          deleteRecado(params);
+
+        break;
+
+
+      // ======================================================
+      // ESCALAS
+      // ======================================================
+
+      case "createEscala":
+
+        response =
+          createEscala(params);
+
+        break;
+
+
+      case "updateEscala":
+
+        response =
+          updateEscala(params);
+
+        break;
+
+
+      case "updateFullEscala":
+
+        response =
+          updateFullEscala(params);
+
+        break;
+
+
+      // ======================================================
+      // SOLICITAÇÕES
+      // ======================================================
+
+      case "createSolicitacao":
+
+        response =
+          createSolicitacao(params);
+
+        break;
+
+
+      case "processaSolicitacao":
+
+        response =
+          processaSolicitacao(params);
+
+        break;
+
+
+      case "updateSolicitacao":
+
+        response =
+          updateSolicitacao(params);
+
+        break;
+
+
+      // ======================================================
+      // TESTE
+      // ======================================================
+
+      case "testarNotificacoes":
+
+        response =
+          testarSistemaNotificacoesInterno(params);
+
+        break;
+
+
+      default:
+
+        response = {
+
+          sucesso: false,
+
+          mensagem:
+            "Ação '" +
+            action +
+            "' não implementada."
+
+        };
+
+        break;
+
+    }
+
+
+    // --------------------------------------------------------
+    // GARANTIR RESPOSTA VÁLIDA
+    // --------------------------------------------------------
+
+    if (
+      !response ||
+      typeof response !== "object"
+    ) {
+
+      response = {
+
+        sucesso: false,
+
+        mensagem:
+          "Resposta inválida do servidor."
+
+      };
+
+    }
+
+
+    if (
+      response.sucesso === undefined
+    ) {
+
+      response.sucesso = false;
+
+    }
+
+
+    if (
+      response.mensagem === undefined ||
+      response.mensagem === null
+    ) {
+
+      response.mensagem =
+        response.sucesso
+          ? "Operação concluída com sucesso."
+          : "Não foi possível concluir a operação.";
+
     }
 
   } catch (error) {
-    response.sucesso = false;
-    response.mensagem = "Erro crítico: " + error.toString();
+
+    response = {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro no servidor: " +
+        safeErrorMessage(error)
+
+    };
+
   }
 
-  return createJsonResponse(response);
+
+  return responseJSON(response);
+
 }
 
-function createJsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
-}
 
-/**
- * Retorna os dados necessários para o App, respeitando regras de visibilidade.
- */
-function getEscalaDataAction(params) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var nome = params.nome;
-  var senha = params.senha;
+// ============================================================
+// LEITURA GERAL
+// ============================================================
 
-  var integrantes = getSheetData(ss, "integrantes");
-  var user = integrantes.find(function(i) {
-    return i.nome && i.nome.toString().trim().toLowerCase() === (nome || "").trim().toLowerCase() &&
-           i.senha && i.senha.toString().trim() === (senha || "").trim();
-  });
+function getEscalaData(params) {
 
-  var isLider = user && user.funcao && user.funcao.toUpperCase().indexOf("LIDER") !== -1;
-  var allSolicitacoes = getSheetData(ss, "solicitacoes");
+  try {
 
-  var filteredSolicitacoes;
-  if (isLider) {
-    filteredSolicitacoes = allSolicitacoes;
-  } else {
-    // Para integrantes comuns, mostrar apenas as solicitações que eles criaram
-    filteredSolicitacoes = allSolicitacoes.filter(function(s) {
-       return s.quem_pediu && s.quem_pediu.toString().trim().toLowerCase() === (nome || "").trim().toLowerCase();
-    });
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var nome =
+      safeString(params.nome)
+        .trim();
+
+
+    var senha =
+      safeString(params.senha)
+        .trim();
+
+
+    // --------------------------------------------------------
+    // INTEGRANTES
+    // --------------------------------------------------------
+
+    var integrantes =
+      getSheetData(
+        ss,
+        ABA_INTEGRANTES,
+        mapIntegrante
+      );
+
+
+    // --------------------------------------------------------
+    // LOCALIZAR USUÁRIO
+    // --------------------------------------------------------
+
+    var usuario = null;
+
+
+    for (
+      var i = 0;
+      i < integrantes.length;
+      i++
+    ) {
+
+      if (
+
+        normalizarTexto(
+          integrantes[i].nome
+        ) ===
+        normalizarTexto(nome)
+
+        &&
+
+        safeString(
+          integrantes[i].senha
+        ).trim() === senha
+
+      ) {
+
+        usuario =
+          integrantes[i];
+
+        break;
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // VERIFICAR LÍDER
+    // --------------------------------------------------------
+
+    var isLider =
+      usuario &&
+      normalizarTexto(
+        usuario.funcao
+      ).indexOf("lider") !== -1;
+
+
+    // --------------------------------------------------------
+    // SOLICITAÇÕES
+    // --------------------------------------------------------
+
+    var todasSolicitacoes =
+      getSheetData(
+        ss,
+        ABA_SOLICITACOES,
+        mapSolicitacao
+      );
+
+
+    var solicitacoes;
+
+
+    if (isLider) {
+
+      solicitacoes =
+        todasSolicitacoes;
+
+    } else {
+
+      solicitacoes =
+        todasSolicitacoes.filter(
+          function(item) {
+
+            return (
+
+              normalizarTexto(
+                item.quem_pediu
+              ) ===
+              normalizarTexto(nome)
+
+            );
+
+          }
+        );
+
+    }
+
+
+    // --------------------------------------------------------
+    // RETORNO
+    // --------------------------------------------------------
+
+    return {
+
+      sucesso: true,
+
+      escala:
+        getSheetData(
+          ss,
+          ABA_ESCALA,
+          mapEscala
+        ),
+
+      integrantes:
+        integrantes,
+
+      solicitacoes:
+        solicitacoes,
+
+      recados:
+        getSheetData(
+          ss,
+          ABA_RECADOS,
+          mapRecado
+        )
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao carregar dados: " +
+        safeErrorMessage(error),
+
+      escala: [],
+      integrantes: [],
+      solicitacoes: [],
+      recados: []
+
+    };
+
   }
+
+}
+
+
+// ============================================================
+// LEITURA GENÉRICA
+// ============================================================
+
+function getSheetData(
+  ss,
+  sheetName,
+  mapFunction
+) {
+
+  var sheet =
+    getSheetSecure(
+      ss,
+      sheetName
+    );
+
+
+  if (!sheet) {
+    return [];
+  }
+
+
+  var data =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  if (
+    !data ||
+    data.length < 2
+  ) {
+
+    return [];
+
+  }
+
+
+  var rows =
+    data.slice(1);
+
+
+  if (mapFunction) {
+
+    return rows
+      .map(mapFunction)
+      .filter(
+        function(item) {
+
+          return (
+            item !== null &&
+            item !== undefined
+          );
+
+        }
+      );
+
+  }
+
+
+  return rows;
+
+}
+
+
+// ============================================================
+// LOCALIZAR ABA DE FORMA ROBUSTA
+// ============================================================
+
+function getSheetSecure(
+  ss,
+  name
+) {
+
+  if (!ss || !name) {
+    return null;
+  }
+
+
+  var sheets =
+    ss.getSheets();
+
+
+  var alvo =
+    normalizarTexto(name);
+
+
+  for (
+    var i = 0;
+    i < sheets.length;
+    i++
+  ) {
+
+    if (
+      normalizarTexto(
+        sheets[i].getName()
+      ) === alvo
+    ) {
+
+      return sheets[i];
+
+    }
+
+  }
+
+
+  return null;
+
+}
+
+
+// ============================================================
+// ESCALA
+// ============================================================
+
+function mapEscala(row) {
 
   return {
-    sucesso: true,
-    escala: getSheetData(ss, "escala"),
-    integrantes: integrantes,
-    solicitacoes: filteredSolicitacoes,
-    recados: getSheetData(ss, "recados")
+
+    data:
+      formatDateBR(row[0]),
+
+    dirigente:
+      safeString(row[1]),
+
+    vocal:
+      safeString(row[2]),
+
+    musicos:
+      safeString(row[3]),
+
+    mesario:
+      safeString(row[4]),
+
+    louvores:
+      safeString(row[5]),
+
+    uniforme:
+      safeString(row[6])
+
   };
+
 }
 
-function getSheetData(ss, sheetName) {
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return [];
 
-  var values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return [];
+// ============================================================
+// INTEGRANTE
+// ============================================================
 
-  var headers = values[0];
-  var data = [];
+function mapIntegrante(row) {
 
-  for (var i = 1; i < values.length; i++) {
-    var row = values[i];
-    var item = {};
-    for (var j = 0; j < headers.length; j++) {
-      var header = headers[j].toString().toLowerCase()
-        .replace(/ /g, "_")
-        .replace(/ç/g, "c")
-        .replace(/[áàâã]/g, "a")
-        .replace(/[éèê]/g, "e")
-        .replace(/[íìî]/g, "i")
-        .replace(/[óòôõ]/g, "o")
-        .replace(/[úùû]/g, "u");
+  return {
 
-      item[header] = row[j];
-    }
-    data.push(item);
+    nome:
+      safeString(row[0]),
+
+    funcao:
+      safeString(row[1]),
+
+    senha:
+      safeString(row[2]),
+
+    instrumento:
+      safeString(row[3])
+
+  };
+
+}
+
+
+// ============================================================
+// SOLICITAÇÃO
+// ============================================================
+
+function mapSolicitacao(row) {
+
+  // Estrutura completa:
+  //
+  // 0 ID
+  // 1 DATA
+  // 2 QUEM PEDIU
+  // 3 FUNÇÃO
+  // 4 INSTRUMENTO
+  // 5 SUBSTITUTO
+  // 6 MOTIVO
+  // 7 STATUS
+  // 8 DATA DECISÃO
+  // 9 DECIDIDO POR
+  // 10 MOTIVO DECISÃO
+  // 11 OBSERVAÇÃO
+
+
+  if (row.length >= 8) {
+
+    return {
+
+      id:
+        safeString(row[0]),
+
+      data_escala:
+        formatDateBR(row[1]),
+
+      quem_pediu:
+        safeString(row[2]),
+
+      funcao:
+        safeString(row[3]),
+
+      instrumento:
+        safeString(row[4]),
+
+      substituto:
+        safeString(row[5]),
+
+      motivo:
+        safeString(row[6]),
+
+      status:
+        safeString(row[7]),
+
+      data_decisao:
+        formatDateTimeBR(row[8]),
+
+      decidido_por:
+        safeString(row[9]),
+
+      motivo_decisao:
+        safeString(row[10])
+
+    };
+
   }
-  return data;
+
+
+  // Estrutura antiga:
+  //
+  // 0 DATA
+  // 1 QUEM PEDIU
+  // 2 SUBSTITUTO
+  // 3 MOTIVO
+  // 4 STATUS
+
+  return {
+
+    id: "",
+
+    data_escala:
+      formatDateBR(row[0]),
+
+    quem_pediu:
+      safeString(row[1]),
+
+    funcao: "",
+
+    instrumento: "",
+
+    substituto:
+      safeString(row[2]),
+
+    motivo:
+      safeString(row[3]),
+
+    status:
+      safeString(row[4]),
+
+    data_decisao: "",
+
+    decidido_por: "",
+
+    motivo_decisao: ""
+
+  };
+
 }
 
-/**
- * Criação de solicitação de troca.
- */
-function createSolicitacaoAction(params) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("solicitacoes");
-  if (!sheet) return { sucesso: false, mensagem: "Aba 'solicitacoes' não encontrada." };
 
-  var nome = params.nome;
-  var dataEscala = params.dataEscala;
-  var substituto = params.substituto;
-  var motivo = params.motivo;
-  var funcao = params.funcao;
-  var instrumento = params.instrumento;
+// ============================================================
+// RECADO
+// ============================================================
 
-  if (!motivo || motivo.trim() === "") return { sucesso: false, mensagem: "Informe o motivo da solicitação." };
-  if (nome === substituto) return { sucesso: false, mensagem: "Você não pode escolher a si mesmo como substituto." };
+function mapRecado(row) {
 
-  // Validar se já existe pendente
-  var data = getSheetData(ss, "solicitacoes");
-  var jaExiste = data.some(function(s) {
-    return s.quem_pediu === nome && s.data_escala === dataEscala && s.status === "PENDENTE";
-  });
-  if (jaExiste) return { sucesso: false, mensagem: "Já existe uma solicitação de troca pendente para esta escala." };
+  return {
 
-  // Validar se substituto já está escalado
-  var escalaData = getSheetData(ss, "escala");
-  var escalaRow = escalaData.find(function(e) { return e.data === dataEscala; });
-  if (escalaRow) {
-    var estaEscalado = (escalaRow.dirigente && escalaRow.dirigente.indexOf(substituto) !== -1) ||
-                       (escalaRow.vocal && escalaRow.vocal.indexOf(substituto) !== -1) ||
-                       (escalaRow.musicos && escalaRow.musicos.indexOf(substituto) !== -1) ||
-                       (escalaRow.mesario && escalaRow.mesario.indexOf(substituto) !== -1);
+    id:
+      safeString(row[0]),
 
-    if (estaEscalado) return { sucesso: false, mensagem: "Este integrante já está escalado nesta data." };
-  }
+    titulo:
+      safeString(row[1]),
 
-  sheet.appendRow([
-    Utilities.getUuid(),
-    dataEscala,
-    nome,
-    funcao,
-    instrumento,
-    substituto,
-    motivo,
-    "PENDENTE",
-    new Date(),
-    "", // Data Decisão
-    "", // Decidido Por
-    ""  // Motivo Decisão
-  ]);
+    mensagem:
+      safeString(row[2]),
 
-  return { sucesso: true, mensagem: "Solicitação de troca enviada com sucesso!" };
+    imagem_url:
+      safeString(row[3]),
+
+    ativo:
+      safeString(row[4]),
+
+    data_criacao:
+      formatDateTimeBR(row[5]),
+
+    data_atualizacao:
+      formatDateTimeBR(row[6])
+
+  };
+
 }
 
-/**
- * Processamento de solicitação (Aprovar, Recusar, Cancelar).
- */
-function processaSolicitacaoAction(params) {
-  var lock = LockService.getScriptLock();
+
+// ============================================================
+// CRIAR ESCALA
+// ============================================================
+
+function createEscala(p) {
+
   try {
-    lock.waitLock(10000); // Aguarda até 10 segundos
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetSolicitacoes = ss.getSheetByName("solicitacoes");
-    var id = params.id;
-    var acao = params.novaAcao;
-    var nomeLider = params.nome;
-    var motivoDecisao = params.motivoDecisao || "";
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
 
-    // 1. Validar permissão de líder se for APROVAR ou RECUSAR
-    if (acao === "APROVAR" || acao === "RECUSAR") {
-      var integrantes = getSheetData(ss, "integrantes");
-      var user = integrantes.find(function(i) { return i.nome === nomeLider; });
-      if (!user || user.funcao.toUpperCase().indexOf("LIDER") === -1) {
-        return { sucesso: false, mensagem: "Somente o Líder pode realizar esta ação." };
-      }
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_ESCALA
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba ESCALA não encontrada."
+
+      };
+
     }
 
-    var values = sheetSolicitacoes.getDataRange().getValues();
-    var rowIndex = -1;
-    var solicitacao = null;
 
-    for (var i = 1; i < values.length; i++) {
-      if (values[i][0] === id) {
-        rowIndex = i + 1;
-        solicitacao = {
-          id: values[i][0],
-          dataEscala: values[i][1],
-          quemPediu: values[i][2],
-          funcao: values[i][3],
-          instrumento: values[i][4],
-          substituto: values[i][5],
-          status: values[i][7]
+    var data =
+      safeString(p.data)
+        .trim();
+
+
+    if (!data) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Data da escala não informada."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        sameDate(
+          values[i][0],
+          data
+        )
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Já existe uma escala cadastrada para esta data."
+
         };
-        break;
+
       }
+
     }
 
-    if (!solicitacao) return { sucesso: false, mensagem: "Solicitação não encontrada." };
-    if (solicitacao.status !== "PENDENTE") return { sucesso: false, mensagem: "Esta solicitação já foi processada." };
 
-    if (acao === "APROVAR") {
-      // 2. Localizar Escala e Aplicar Troca
-      var resTroca = aplicarTrocaNaEscala(ss, solicitacao);
-      if (!resTroca.sucesso) return resTroca;
+    sheet.appendRow([
 
-      // 3. Atualizar Status
-      updateSolicitacaoStatusRow(sheetSolicitacoes, rowIndex, "APROVADA", nomeLider, motivoDecisao);
-      return { sucesso: true, mensagem: "Solicitação aprovada e escala atualizada!" };
+      data,
 
-    } else if (acao === "RECUSAR") {
-      updateSolicitacaoStatusRow(sheetSolicitacoes, rowIndex, "RECUSADA", nomeLider, motivoDecisao);
-      return { sucesso: true, mensagem: "Solicitação recusada." };
+      safeString(p.dirigente),
 
-    } else if (acao === "CANCELAR") {
-      if (solicitacao.quemPediu !== nomeLider) return { sucesso: false, mensagem: "Somente o solicitante pode cancelar." };
-      updateSolicitacaoStatusRow(sheetSolicitacoes, rowIndex, "CANCELADA", nomeLider, "Cancelado pelo usuário");
-      return { sucesso: true, mensagem: "Solicitação cancelada." };
+      safeString(p.vocal),
+
+      safeString(p.musicos),
+
+      safeString(p.mesario),
+
+      safeString(p.louvores),
+
+      safeString(p.uniforme)
+
+    ]);
+
+
+    criarNotificacaoParaTodos(
+
+      ss,
+
+      "Nova escala",
+
+      "Uma nova escala foi cadastrada para " +
+      data +
+      ".",
+
+      "ESCALA"
+
+    );
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        "Escala criada com sucesso."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao criar escala: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// ATUALIZAR CAMPO DA ESCALA
+// ============================================================
+
+function updateEscala(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_ESCALA
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba ESCALA não encontrada."
+
+      };
+
     }
 
-    return { sucesso: false, mensagem: "Ação inválida." };
+
+    var campo =
+      safeString(p.campo)
+        .trim()
+        .toLowerCase();
+
+
+    var allowedFields = {
+
+      dirigente: 2,
+      vocal: 3,
+      musicos: 4,
+      mesario: 5,
+      louvores: 6,
+      uniforme: 7
+
+    };
+
+
+    if (
+      !allowedFields[campo]
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Campo de escala não permitido."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        sameDate(
+          values[i][0],
+          p.data
+        )
+      ) {
+
+        sheet
+          .getRange(
+            i + 1,
+            allowedFields[campo]
+          )
+          .setValue(
+            safeString(p.valor)
+          );
+
+
+        criarNotificacaoParaTodos(
+
+          ss,
+
+          "Escala atualizada",
+
+          "A escala de " +
+          safeString(p.data) +
+          " foi atualizada.",
+
+          "ESCALA"
+
+        );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Escala atualizada com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Escala não localizada para a data informada."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao atualizar escala: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// ATUALIZAR ESCALA COMPLETA
+// ============================================================
+
+function updateFullEscala(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_ESCALA
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba ESCALA não encontrada."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        sameDate(
+          values[i][0],
+          p.data
+        )
+      ) {
+
+        sheet
+          .getRange(
+            i + 1,
+            2,
+            1,
+            6
+          )
+          .setValues([[
+
+            safeString(p.dirigente),
+
+            safeString(p.vocal),
+
+            safeString(p.musicos),
+
+            safeString(p.mesario),
+
+            safeString(p.louvores),
+
+            safeString(p.uniforme)
+
+          ]]);
+
+
+        criarNotificacaoParaTodos(
+
+          ss,
+
+          "Escala atualizada",
+
+          "A escala de " +
+          safeString(p.data) +
+          " foi atualizada.",
+
+          "ESCALA"
+
+        );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Escala atualizada com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Escala não localizada para a data informada."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao atualizar escala: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// CRIAR SOLICITAÇÃO
+// ============================================================
+
+function createSolicitacao(p) {
+
+  var lock =
+    LockService.getScriptLock();
+
+
+  try {
+
+    lock.waitLock(10000);
+
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_SOLICITACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba SOLICITAÇÕES não encontrada."
+
+      };
+
+    }
+
+
+    var nome =
+      safeString(p.nome)
+        .trim();
+
+
+    var dataEscala =
+      safeString(
+        p.dataEscala ||
+        p.data_escala
+      ).trim();
+
+
+    var substituto =
+      safeString(p.substituto)
+        .trim();
+
+
+    var motivo =
+      safeString(p.motivo)
+        .trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Solicitante não informado."
+
+      };
+
+    }
+
+
+    if (!dataEscala) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Data da escala não informada."
+
+      };
+
+    }
+
+
+    if (!substituto) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Informe quem irá substituir."
+
+      };
+
+    }
+
+
+    if (!motivo) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Informe o motivo da solicitação."
+
+      };
+
+    }
+
+
+    if (
+      normalizarTexto(nome) ===
+      normalizarTexto(substituto)
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Você não pode escolher a si mesmo como substituto."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // ESCALA
+    // --------------------------------------------------------
+
+    var sheetEscala =
+      getSheetSecure(
+        ss,
+        ABA_ESCALA
+      );
+
+
+    if (!sheetEscala) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba ESCALA não encontrada."
+
+      };
+
+    }
+
+
+    var escalas =
+      sheetEscala
+        .getDataRange()
+        .getValues();
+
+
+    var escalaEncontrada =
+      null;
+
+
+    for (
+      var i = 1;
+      i < escalas.length;
+      i++
+    ) {
+
+      if (
+        sameDate(
+          escalas[i][0],
+          dataEscala
+        )
+      ) {
+
+        escalaEncontrada =
+          escalas[i];
+
+        break;
+
+      }
+
+    }
+
+
+    if (!escalaEncontrada) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Não foi encontrada escala para a data informada."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // VERIFICAR SOLICITANTE
+    // --------------------------------------------------------
+
+    var colunasFuncoes = [
+      1,
+      2,
+      3,
+      4
+    ];
+
+
+    var solicitanteEncontrado =
+      false;
+
+
+    for (
+      var c = 0;
+      c < colunasFuncoes.length;
+      c++
+    ) {
+
+      var valor =
+        safeString(
+          escalaEncontrada[
+            colunasFuncoes[c]
+          ]
+        );
+
+
+      if (
+        contemNome(
+          valor,
+          nome
+        )
+      ) {
+
+        solicitanteEncontrado =
+          true;
+
+        break;
+
+      }
+
+    }
+
+
+    if (!solicitanteEncontrado) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "O solicitante não está escalado nesta data."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // SUBSTITUTO JÁ ESCALADO?
+    // --------------------------------------------------------
+
+    for (
+      var x = 0;
+      x < colunasFuncoes.length;
+      x++
+    ) {
+
+      var pessoas =
+        safeString(
+          escalaEncontrada[
+            colunasFuncoes[x]
+          ]
+        );
+
+
+      if (
+        contemNome(
+          pessoas,
+          substituto
+        )
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "O substituto informado já está escalado nesta data."
+
+        };
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // SOLICITAÇÃO PENDENTE
+    // --------------------------------------------------------
+
+    var solicitacoes =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var s = 1;
+      s < solicitacoes.length;
+      s++
+    ) {
+
+      var status =
+        obterStatusSolicitacao(
+          solicitacoes[s]
+        );
+
+
+      var pessoa =
+        obterQuemPediu(
+          solicitacoes[s]
+        );
+
+
+      var dataExistente =
+        obterDataSolicitacao(
+          solicitacoes[s]
+        );
+
+
+      if (
+
+        sameDate(
+          dataExistente,
+          dataEscala
+        )
+
+        &&
+
+        normalizarTexto(pessoa) ===
+        normalizarTexto(nome)
+
+        &&
+
+        status === "PENDENTE"
+
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Já existe uma solicitação de troca pendente para esta escala."
+
+        };
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // DETECTAR ESTRUTURA
+    // --------------------------------------------------------
+
+    var ultimaColuna =
+      sheet.getLastColumn();
+
+
+    var idSolicitacao =
+      Utilities.getUuid();
+
+
+    if (ultimaColuna >= 8) {
+
+      sheet.appendRow([
+
+        idSolicitacao,
+
+        dataEscala,
+
+        nome,
+
+        safeString(p.funcao),
+
+        safeString(p.instrumento),
+
+        substituto,
+
+        motivo,
+
+        "PENDENTE",
+
+        new Date(),
+
+        "",
+
+        "",
+
+        ""
+
+      ]);
+
+    } else {
+
+      sheet.appendRow([
+
+        dataEscala,
+
+        nome,
+
+        substituto,
+
+        motivo,
+
+        "PENDENTE"
+
+      ]);
+
+    }
+
+
+    // --------------------------------------------------------
+    // NOTIFICAR LÍDERES
+    // --------------------------------------------------------
+
+    criarNotificacaoParaLideres(
+
+      ss,
+
+      "Nova solicitação de troca",
+
+      nome +
+      " solicitou uma troca para " +
+      dataEscala +
+      ".",
+
+      "SOLICITACAO"
+
+    );
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        "Solicitação de troca enviada com sucesso."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao criar solicitação: " +
+        safeErrorMessage(error)
+
+    };
 
   } finally {
-    lock.releaseLock();
+
+    try {
+      lock.releaseLock();
+    } catch (e) {}
+
   }
+
 }
 
-function updateSolicitacaoStatusRow(sheet, rowIndex, status, decididoPor, motivo) {
-  sheet.getRange(rowIndex, 8).setValue(status);
-  sheet.getRange(rowIndex, 10).setValue(new Date());
-  sheet.getRange(rowIndex, 11).setValue(decididoPor);
-  sheet.getRange(rowIndex, 12).setValue(motivo);
-}
 
-function aplicarTrocaNaEscala(ss, solicitacao) {
-  var sheetEscala = ss.getSheetByName("escala");
-  var values = sheetEscala.getDataRange().getValues();
-  var headers = values[0];
-  var colIndexData = headers.indexOf("DATA");
-  var colIndexDirigente = headers.indexOf("DIRIGENTE");
-  var colIndexVocal = headers.indexOf("VOCAL");
-  var colIndexMusicos = headers.indexOf("MUSICOS");
-  var colIndexMesario = headers.indexOf("MESARIO");
+// ============================================================
+// PROCESSAR SOLICITAÇÃO
+// ============================================================
 
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][colIndexData] === solicitacao.dataEscala) {
-      var rowIndex = i + 1;
+function processaSolicitacao(p) {
 
-      // Verificar se o substituto já está na escala em OUTRA função
-      var row = values[i];
-      var jaNaEscala = false;
-      [colIndexDirigente, colIndexVocal, colIndexMusicos, colIndexMesario].forEach(function(ci) {
-        if (ci !== -1 && row[ci] && row[ci].toString().indexOf(solicitacao.substituto) !== -1) {
-          jaNaEscala = true;
-        }
-      });
-      if (jaNaEscala) return { sucesso: false, mensagem: "Não foi possível aprovar. O substituto já está escalado nesta data." };
+  var lock =
+    LockService.getScriptLock();
 
-      // Aplicar substituição no campo correto
-      var campoAfetado = -1;
-      var valorAtual = "";
 
-      if (solicitacao.funcao === "Dirigente") campoAfetado = colIndexDirigente;
-      else if (solicitacao.funcao === "Vocal") campoAfetado = colIndexVocal;
-      else if (solicitacao.funcao === "Músico") campoAfetado = colIndexMusicos;
-      else if (solicitacao.funcao === "Mesário") campoAfetado = colIndexMesario;
-
-      if (campoAfetado !== -1) {
-        valorAtual = row[campoAfetado].toString();
-        // Substituir respeitando o formato (especialmente para músicos com instrumentos)
-        var novoValor = valorAtual.replace(solicitacao.quemPediu, solicitacao.substituto);
-        sheetEscala.getRange(rowIndex, campoAfetado + 1).setValue(novoValor);
-        return { sucesso: true };
-      }
-
-      return { sucesso: false, mensagem: "Função do solicitante não encontrada na escala." };
-    }
-  }
-  return { sucesso: false, mensagem: "Escala da data " + solicitacao.dataEscala + " não encontrada." };
-}
-
-/**
- * Ações de Recado (Preservando as existentes)
- */
-function createRecadoAction(params) {
-  var result = { sucesso: false, mensagem: "Falha ao criar recado." };
   try {
-    var titulo = params.titulo;
-    var mensagem = params.mensagem;
-    var imageBase64 = params.imageBase64;
-    var imagemUrl = "";
 
-    if (imageBase64 && imageBase64.length > 0) {
-      try {
-        var folderId = "SEU_FOLDER_ID_DO_DRIVE"; // ADAPTE COM SEU ID
-        var folder = DriveApp.getFolderById(folderId);
-        var contentType = "image/jpeg";
-        var fileName = "recado_" + new Date().getTime() + ".jpg";
-        var decoded = Utilities.base64Decode(imageBase64);
-        var blob = Utilities.newBlob(decoded, contentType, fileName);
-        var file = folder.createFile(blob);
-        // O compartilhamento deve ser gerenciado pela pasta, mas mantemos se necessário
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        imagemUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
-      } catch (e) {
-        return { sucesso: false, mensagem: "Erro ao salvar imagem no Drive: " + e.toString() };
+    lock.waitLock(10000);
+
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_SOLICITACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba SOLICITAÇÕES não encontrada."
+
+      };
+
+    }
+
+
+    var acao =
+      safeString(
+        p.acao ||
+        p.novaAcao
+      )
+        .trim()
+        .toUpperCase();
+
+
+    var nomeUsuario =
+      safeString(p.nome)
+        .trim();
+
+
+    var dataEscala =
+      safeString(
+        p.dataEscala ||
+        p.data_escala
+      ).trim();
+
+
+    var quemPediu =
+      safeString(
+        p.quemPediu ||
+        p.quem_pediu
+      ).trim();
+
+
+    var substituto =
+      safeString(p.substituto)
+        .trim();
+
+
+    var motivoDecisao =
+      safeString(
+        p.motivoDecisao ||
+        p.motivo_decisao
+      ).trim();
+
+
+    var idRecebido =
+      safeString(p.id)
+        .trim();
+
+
+    if (!acao) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Ação não informada."
+
+      };
+
+    }
+
+
+    if (!nomeUsuario) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Usuário não informado."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // LOCALIZAR
+    // --------------------------------------------------------
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    var rowIndex =
+      -1;
+
+
+    var solicitacao =
+      null;
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      var linha =
+        values[i];
+
+
+      var idLinha =
+        obterIdSolicitacao(
+          linha
+        );
+
+
+      var dataLinha =
+        obterDataSolicitacao(
+          linha
+        );
+
+
+      var pessoaLinha =
+        obterQuemPediu(
+          linha
+        );
+
+
+      var substitutoLinha =
+        obterSubstituto(
+          linha
+        );
+
+
+      var statusLinha =
+        obterStatusSolicitacao(
+          linha
+        );
+
+
+      var encontrou =
+        false;
+
+
+      if (
+        idRecebido &&
+        idLinha &&
+        compararId(
+          idLinha,
+          idRecebido
+        )
+      ) {
+
+        encontrou = true;
+
       }
-    }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("recados");
-    sheet.appendRow([Utilities.getUuid(), titulo, mensagem, imagemUrl, "SIM", new Date(), new Date()]);
-    result.sucesso = true;
-    result.mensagem = "Recado publicado com sucesso!";
-  } catch (e) {
-    result.mensagem = "Erro ao acessar planilha: " + e.toString();
-  }
-  return result;
-}
 
-function updateRecadoAction(params) {
-  var result = { sucesso: false, mensagem: "Falha ao atualizar recado." };
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("recados");
-    var id = params.id;
-    var values = sheet.getDataRange().getValues();
+      if (
+        !encontrou &&
+        dataEscala &&
+        quemPediu &&
+        substituto
+      ) {
 
-    for (var i = 1; i < values.length; i++) {
-      if (values[i][0] === id) {
-        sheet.getRange(i + 1, 2).setValue(params.titulo);
-        sheet.getRange(i + 1, 3).setValue(params.mensagem);
-        if (params.imagemUrl) sheet.getRange(i + 1, 4).setValue(params.imagemUrl);
-        sheet.getRange(i + 1, 5).setValue(params.ativo);
-        sheet.getRange(i + 1, 7).setValue(new Date());
-        return { sucesso: true, mensagem: "Recado atualizado!" };
-      }
-    }
-  } catch (e) { result.mensagem = e.toString(); }
-  return result;
-}
+        if (
 
-function deleteRecadoAction(params) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("recados");
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][0] === params.id) {
-      sheet.deleteRow(i + 1);
-      return { sucesso: true, mensagem: "Recado removido!" };
-    }
-  }
-  return { sucesso: false, mensagem: "Recado não encontrado." };
-}
+          sameDate(
+            dataLinha,
+            dataEscala
+          )
 
-/**
- * DIAGNÓSTICO TEMPORÁRIO: testarIntegrantesEscalaNotificacao
- * Objetivo: Verificar se o script consegue identificar corretamente os integrantes escalados.
- */
-function testarIntegrantesEscalaNotificacao() {
-  var targetDateStr = "14/08/2026";
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetEscala = ss.getSheetByName("ESCALA");
-  var sheetIntegrantes = ss.getSheetByName("INTEGRANTES");
+          &&
 
-  if (!sheetEscala || !sheetIntegrantes) {
-    Logger.log("ERRO: Aba ESCALA ou INTEGRANTES não encontrada.");
-    return;
-  }
+          normalizarTexto(pessoaLinha) ===
+          normalizarTexto(quemPediu)
 
-  var escalaData = sheetEscala.getDataRange().getValues();
-  var headers = escalaData[0].map(function(h) { return h.toString().toUpperCase().trim(); });
+          &&
 
-  var colData = headers.indexOf("DATA");
-  var colDirigente = headers.indexOf("DIRIGENTE");
-  var colVocal = headers.indexOf("VOCAL");
-  var colMusicos = headers.indexOf("MUSICOS");
-  var colMesario = headers.indexOf("MESÁRIO");
-  if (colMesario === -1) colMesario = headers.indexOf("MESARIO");
-  var colLouvores = headers.indexOf("LOUVORES");
-  var colUniforme = headers.indexOf("UNIFORME");
+          normalizarTexto(substitutoLinha) ===
+          normalizarTexto(substituto)
 
-  var escalaEncontrada = null;
-  for (var i = 1; i < escalaData.length; i++) {
-    var row = escalaData[i];
-    var rowDate = row[colData];
+        ) {
 
-    // Normalização de data para comparação
-    var currentDataStr = "";
-    if (rowDate instanceof Date) {
-      currentDataStr = Utilities.formatDate(rowDate, ss.getSpreadsheetTimeZone(), "dd/MM/yyyy");
-    } else {
-      currentDataStr = rowDate.toString().trim();
-    }
+          encontrou = true;
 
-    if (currentDataStr === targetDateStr || currentDataStr.indexOf(targetDateStr.substring(0,5)) === 0) {
-      escalaEncontrada = row;
-      break;
-    }
-  }
-
-  if (!escalaEncontrada) {
-    Logger.log("ERRO: Escala para a data " + targetDateStr + " não encontrada.");
-    return;
-  }
-
-  // ETAPA 1 e 2 - Extrair e Separar Nomes
-  var integrantesNaEscala = {}; // { NOME_NORMALIZADO: { nomeOriginal: string, funcoes: [] } }
-
-  function processarCampo(valor, funcao) {
-    if (!valor) return;
-    var nomes = valor.toString().split(/[xX,]/);
-    nomes.forEach(function(n) {
-      var nomeLimpo = n.split(/[—\-]/)[0].trim(); // Remove instrumento se houver
-      if (nomeLimpo) {
-        var norm = normalizarTexto(nomeLimpo);
-        if (!integrantesNaEscala[norm]) {
-          integrantesNaEscala[norm] = { nome: nomeLimpo, funcoes: [] };
         }
-        if (integrantesNaEscala[norm].funcoes.indexOf(funcao) === -1) {
-          integrantesNaEscala[norm].funcoes.push(funcao);
-        }
+
       }
-    });
-  }
 
-  processarCampo(escalaEncontrada[colDirigente], "DIRIGENTE");
-  processarCampo(escalaEncontrada[colVocal], "VOCAL");
-  processarCampo(escalaEncontrada[colMusicos], "MUSICO");
-  processarCampo(escalaEncontrada[colMesario], "MESARIO");
 
-  // ETAPA 4 - Consultar Detalhes dos Integrantes
-  var integrantesInfo = {}; // { NORM: { funcao: string, instrumento: string } }
-  var integrantesPlanilha = getSheetData(ss, "INTEGRANTES");
-  integrantesPlanilha.forEach(function(int) {
-    var norm = normalizarTexto(int.nome);
-    integrantesInfo[norm] = {
-      funcao: int.funcao,
-      instrumento: int.instrumento
+      if (
+        encontrou &&
+        statusLinha === "PENDENTE"
+      ) {
+
+        rowIndex =
+          i + 1;
+
+
+        solicitacao = {
+
+          id:
+            idLinha,
+
+          dataEscala:
+            formatDateBR(dataLinha),
+
+          quemPediu:
+            pessoaLinha,
+
+          funcao:
+            obterFuncaoSolicitacao(
+              linha
+            ),
+
+          instrumento:
+            obterInstrumentoSolicitacao(
+              linha
+            ),
+
+          substituto:
+            substitutoLinha,
+
+          motivo:
+            obterMotivoSolicitacao(
+              linha
+            ),
+
+          status:
+            statusLinha
+
+        };
+
+
+        break;
+
+      }
+
+    }
+
+
+    if (!solicitacao) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Solicitação pendente não encontrada."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // APROVAR / RECUSAR
+    // SOMENTE LÍDER
+    // --------------------------------------------------------
+
+    if (
+      acao === "APROVAR" ||
+      acao === "RECUSAR"
+    ) {
+
+      var integrantes =
+        getSheetData(
+          ss,
+          ABA_INTEGRANTES,
+          mapIntegrante
+        );
+
+
+      var ehLider =
+        false;
+
+
+      for (
+        var j = 0;
+        j < integrantes.length;
+        j++
+      ) {
+
+        if (
+
+          normalizarTexto(
+            integrantes[j].nome
+          ) ===
+          normalizarTexto(nomeUsuario)
+
+          &&
+
+          normalizarTexto(
+            integrantes[j].funcao
+          ).indexOf("lider") !== -1
+
+        ) {
+
+          ehLider = true;
+
+          break;
+
+        }
+
+      }
+
+
+      if (!ehLider) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Somente o Líder pode realizar esta ação."
+
+        };
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // APROVAR
+    // --------------------------------------------------------
+
+    if (
+      acao === "APROVAR"
+    ) {
+
+      var resultado =
+        aplicarTrocaNaEscala(
+          ss,
+          solicitacao
+        );
+
+
+      if (
+        !resultado.sucesso
+      ) {
+
+        return resultado;
+
+      }
+
+
+      atualizarStatusSolicitacao(
+
+        sheet,
+
+        rowIndex,
+
+        "APROVADA",
+
+        nomeUsuario,
+
+        motivoDecisao
+
+      );
+
+
+      criarNotificacao(
+
+        ss,
+
+        solicitacao.quemPediu,
+
+        "Troca aprovada",
+
+        "Sua solicitação de troca para " +
+        solicitacao.dataEscala +
+        " foi aprovada.",
+
+        "SOLICITACAO"
+
+      );
+
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Solicitação aprovada e escala atualizada com sucesso."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // RECUSAR
+    // --------------------------------------------------------
+
+    if (
+      acao === "RECUSAR"
+    ) {
+
+      atualizarStatusSolicitacao(
+
+        sheet,
+
+        rowIndex,
+
+        "RECUSADA",
+
+        nomeUsuario,
+
+        motivoDecisao
+
+      );
+
+
+      criarNotificacao(
+
+        ss,
+
+        solicitacao.quemPediu,
+
+        "Troca recusada",
+
+        "Sua solicitação de troca para " +
+        solicitacao.dataEscala +
+        " foi recusada." +
+
+        (
+
+          motivoDecisao
+            ? " Motivo: " +
+              motivoDecisao
+            : ""
+
+        ),
+
+        "SOLICITACAO"
+
+      );
+
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Solicitação recusada com sucesso."
+
+      };
+
+    }
+
+
+    // --------------------------------------------------------
+    // CANCELAR
+    // --------------------------------------------------------
+
+    if (
+      acao === "CANCELAR"
+    ) {
+
+      if (
+
+        normalizarTexto(
+          solicitacao.quemPediu
+        ) !==
+
+        normalizarTexto(
+          nomeUsuario
+        )
+
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Somente o solicitante pode cancelar a solicitação."
+
+        };
+
+      }
+
+
+      atualizarStatusSolicitacao(
+
+        sheet,
+
+        rowIndex,
+
+        "CANCELADA",
+
+        nomeUsuario,
+
+        motivoDecisao ||
+        "Cancelado pelo usuário"
+
+      );
+
+
+      criarNotificacaoParaLideres(
+
+        ss,
+
+        "Solicitação cancelada",
+
+        solicitacao.quemPediu +
+        " cancelou a solicitação para " +
+        solicitacao.dataEscala +
+        ".",
+
+        "SOLICITACAO"
+
+      );
+
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Solicitação cancelada com sucesso."
+
+      };
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Ação inválida: " +
+        acao
+
     };
-  });
 
-  // ETAPA 7 - Montar Log
-  var log = "\n========================================\n";
-  log += "TESTE DE INTEGRANTES DA ESCALA\n";
-  log += "========================================\n\n";
-  log += "DATA: " + targetDateStr + "\n";
 
-  // Obter Título do Culto (lógica simplificada para o teste)
-  var titulo = "Culto";
-  try {
-     // A regra central virá do app depois, aqui fazemos manual ou chamamos helper se existisse
-     // Para o log exemplo: "Cura e Libertação" se for sexta
-     titulo = "Cura e Libertação";
-  } catch(e){}
+  } catch (error) {
 
-  log += "CULTO: " + titulo + "\n\n";
-  log += "INTEGRANTES ENCONTRADOS:\n\n";
+    return {
 
-  var count = 1;
-  var listaEncontradosNorm = Object.keys(integrantesNaEscala);
-  listaEncontradosNorm.sort().forEach(function(norm) {
-    var item = integrantesNaEscala[norm];
-    var info = integrantesInfo[norm] || { funcao: "N/A", instrumento: "N/A" };
-    log += count + ". " + item.nome.toUpperCase() + "\n";
-    log += "   Funções na Escala: " + item.funcoes.join(", ") + "\n";
-    log += "   Cadastro: " + info.funcao + (info.instrumento ? " (" + info.instrumento + ")" : "") + "\n\n";
-    count++;
-  });
+      sucesso: false,
 
-  log += "----------------------------------------\n\n";
-  log += "TESTE DE USUÁRIOS\n\n";
+      mensagem:
+        "Erro ao processar solicitação: " +
+        safeErrorMessage(error)
 
-  var usuariosTeste = ["JACO", "NEUZA", "LUCIANA", "PIETRO", "JADSON", "VICTORIA"];
-  usuariosTeste.forEach(function(u) {
-    var normU = normalizarTexto(u);
-    var escalado = integrantesNaEscala[normU];
-    var status = escalado ? "-> ESCALADO" : "-> NÃO ESCALADO";
-    if (escalado && normU === "victoria") status = "-> ESCALADA";
+    };
 
-    var pad = u;
-    while(pad.length < 8) pad += " ";
-    log += pad + " " + status + (escalado ? " (" + escalado.funcoes.join(", ") + ")" : "") + "\n";
-  });
+  } finally {
 
-  log += "\n========================================\n";
+    try {
+      lock.releaseLock();
+    } catch (e) {}
 
-  Logger.log(log);
+  }
+
 }
 
-  /**
- * Ações de Notificações
- */
-function getNotificacoesAction(params) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var nome = params.nome;
-  var senha = params.senha;
 
-  // Validar usuário
-  var integrantes = getSheetData(ss, "integrantes");
-  var user = integrantes.find(function(i) {
-    return i.nome && i.nome.toString().trim().toLowerCase() === (nome || "").trim().toLowerCase() &&
-           i.senha && i.senha.toString().trim() === (senha || "").trim();
-  });
+// ============================================================
+// APLICAR TROCA NA ESCALA
+// ============================================================
 
-  if (!user) return { sucesso: false, mensagem: "Usuário não autenticado." };
+function aplicarTrocaNaEscala(
+  ss,
+  solicitacao
+) {
 
-  var todasNotif = getSheetData(ss, "notificacoes");
-  var userNotif = todasNotif.filter(function(n) {
-    return n.destinatario && n.destinatario.toString().trim().toLowerCase() === user.nome.toString().trim().toLowerCase() &&
-           n.lida && n.lida.toString().toUpperCase() === "NAO";
-  });
+  var sheet =
+    getSheetSecure(
+      ss,
+      ABA_ESCALA
+    );
+
+
+  if (!sheet) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Aba ESCALA não encontrada."
+
+    };
+
+  }
+
+
+  var values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  for (
+    var i = 1;
+    i < values.length;
+    i++
+  ) {
+
+    if (
+      !sameDate(
+        values[i][0],
+        solicitacao.dataEscala
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    var row =
+      values[i];
+
+
+    var colunas = [
+
+      {
+        indice: 1,
+        nome: "Dirigente"
+      },
+
+      {
+        indice: 2,
+        nome: "Vocal"
+      },
+
+      {
+        indice: 3,
+        nome: "Músicos"
+      },
+
+      {
+        indice: 4,
+        nome: "Mesário"
+      }
+
+    ];
+
+
+    // --------------------------------------------------------
+    // SUBSTITUTO JÁ ESCALADO
+    // --------------------------------------------------------
+
+    for (
+      var v = 0;
+      v < colunas.length;
+      v++
+    ) {
+
+      var pessoas =
+        safeString(
+          row[
+            colunas[v].indice
+          ]
+        );
+
+
+      if (
+        contemNome(
+          pessoas,
+          solicitacao.substituto
+        )
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Não foi possível aprovar. O substituto '" +
+            solicitacao.substituto +
+            "' já está escalado nesta data."
+
+        };
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // DETERMINAR FUNÇÃO
+    // --------------------------------------------------------
+
+    var campoAfetado =
+      -1;
+
+
+    var nomeFuncao =
+      "";
+
+
+    var funcao =
+      normalizarTexto(
+        solicitacao.funcao
+      );
+
+
+    if (
+      funcao.indexOf("dirigente") !== -1
+    ) {
+
+      campoAfetado = 1;
+      nomeFuncao = "Dirigente";
+
+    }
+
+    else if (
+      funcao.indexOf("vocal") !== -1
+    ) {
+
+      campoAfetado = 2;
+      nomeFuncao = "Vocal";
+
+    }
+
+    else if (
+      funcao.indexOf("music") !== -1
+    ) {
+
+      campoAfetado = 3;
+      nomeFuncao = "Músicos";
+
+    }
+
+    else if (
+      funcao.indexOf("mesar") !== -1
+    ) {
+
+      campoAfetado = 4;
+      nomeFuncao = "Mesário";
+
+    }
+
+
+    // --------------------------------------------------------
+    // SE FUNÇÃO NÃO FOI IDENTIFICADA,
+    // PROCURAR PELO NOME
+    // --------------------------------------------------------
+
+    if (
+      campoAfetado === -1
+    ) {
+
+      for (
+        var c = 0;
+        c < colunas.length;
+        c++
+      ) {
+
+        var valor =
+          safeString(
+            row[
+              colunas[c].indice
+            ]
+          );
+
+
+        if (
+          contemNome(
+            valor,
+            solicitacao.quemPediu
+          )
+        ) {
+
+          campoAfetado =
+            colunas[c].indice;
+
+          nomeFuncao =
+            colunas[c].nome;
+
+          break;
+
+        }
+
+      }
+
+    }
+
+
+    if (
+      campoAfetado === -1
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "O solicitante '" +
+          solicitacao.quemPediu +
+          "' não foi encontrado na escala desta data."
+
+      };
+
+    }
+
+
+    var valorAtual =
+      safeString(
+        row[campoAfetado]
+      );
+
+
+    var novoValor =
+      substituirNome(
+        valorAtual,
+        solicitacao.quemPediu,
+        solicitacao.substituto
+      );
+
+
+    if (
+      novoValor === valorAtual
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Não foi possível realizar a substituição."
+
+      };
+
+    }
+
+
+    sheet
+      .getRange(
+        i + 1,
+        campoAfetado + 1
+      )
+      .setValue(
+        novoValor
+      );
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        "Troca realizada na função '" +
+        nomeFuncao +
+        "'."
+
+    };
+
+  }
+
 
   return {
-    sucesso: true,
-    mensagem: userNotif.length + " notificação(ões) encontrada(s).",
-    notificacoes: userNotif
+
+    sucesso: false,
+
+    mensagem:
+      "Escala não encontrada para a data da solicitação."
+
   };
+
 }
 
-function marcarNotificacaoComoLidaAction(params) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var id = params.id;
-  var nome = params.nome;
-  var senha = params.senha;
 
-  // Validar usuário
-  var integrantes = getSheetData(ss, "integrantes");
-  var user = integrantes.find(function(i) {
-    return i.nome && i.nome.toString().trim().toLowerCase() === (nome || "").trim().toLowerCase() &&
-           i.senha && i.senha.toString().trim() === (senha || "").trim();
-  });
+// ============================================================
+// ATUALIZAR STATUS DA SOLICITAÇÃO
+// ============================================================
 
-  if (!user) return { sucesso: false, mensagem: "Usuário não autenticado." };
+function atualizarStatusSolicitacao(
+  sheet,
+  rowIndex,
+  status,
+  decididoPor,
+  motivo
+) {
 
-  var sheet = ss.getSheetByName("notificacoes");
-  if (!sheet) return { sucesso: false, mensagem: "Aba 'notificacoes' não encontrada." };
+  var lastColumn =
+    sheet.getLastColumn();
 
-  var values = sheet.getDataRange().getValues();
-  var headers = values[0].map(function(h) { return h.toString().toUpperCase().trim(); });
-  var colId = headers.indexOf("ID");
-  var colLida = headers.indexOf("LIDA");
 
-  if (colId === -1 || colLida === -1) return { sucesso: false, mensagem: "Estrutura da aba incorreta." };
+  // Estrutura completa
+  if (
+    lastColumn >= 8
+  ) {
 
-  for (var i = 1; i < values.length; i++) {
-    // Compara IDs de forma robusta: convertendo para string e removendo espaços
-    var sheetId = values[i][colId].toString().trim();
-    var requestId = id.toString().trim();
+    sheet
+      .getRange(
+        rowIndex,
+        8
+      )
+      .setValue(
+        status
+      );
 
-    if (sheetId == requestId) {
-      sheet.getRange(i + 1, colLida + 1).setValue("SIM");
-      return { sucesso: true, mensagem: "Notificacao marcada como lida no servidor." };
+
+    sheet
+      .getRange(
+        rowIndex,
+        9
+      )
+      .setValue(
+        new Date()
+      );
+
+
+    if (
+      lastColumn >= 10
+    ) {
+
+      sheet
+        .getRange(
+          rowIndex,
+          10
+        )
+        .setValue(
+          decididoPor
+        );
+
     }
+
+
+    if (
+      lastColumn >= 11
+    ) {
+
+      sheet
+        .getRange(
+          rowIndex,
+          11
+        )
+        .setValue(
+          motivo
+        );
+
+    }
+
+
+    return;
+
   }
 
-  return { sucesso: false, mensagem: "Notificação não encontrada." };
+
+  // Estrutura antiga
+  sheet
+    .getRange(
+      rowIndex,
+      5
+    )
+    .setValue(
+      status
+    );
+
 }
 
-/**
- * Normaliza o texto removendo acentos, espaços extras e convertendo para minúsculas.
- */
-function normalizarTexto(txt) {
-  if (!txt) return "";
-  return txt.toString().toLowerCase().trim()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
-    .replace(/\s+/g, " "); // Remove espaços duplos
+
+// ============================================================
+// ATUALIZAR SOLICITAÇÃO
+// ============================================================
+
+function updateSolicitacao(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_SOLICITACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba SOLICITAÇÕES não encontrada."
+
+      };
+
+    }
+
+
+    var data =
+      safeString(
+        p.dataEscala ||
+        p.data_escala
+      ).trim();
+
+
+    var quem =
+      safeString(
+        p.quemPediu ||
+        p.quem_pediu
+      ).trim();
+
+
+    var status =
+      safeString(p.status)
+        .trim()
+        .toUpperCase();
+
+
+    if (!status) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Status não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+
+        sameDate(
+          obterDataSolicitacao(
+            values[i]
+          ),
+          data
+        )
+
+        &&
+
+        normalizarTexto(
+          obterQuemPediu(
+            values[i]
+          )
+        ) ===
+        normalizarTexto(quem)
+
+      ) {
+
+        atualizarStatusSolicitacao(
+
+          sheet,
+
+          i + 1,
+
+          status,
+
+          safeString(p.nome),
+
+          safeString(
+            p.motivoDecisao ||
+            p.motivo_decisao
+          )
+
+        );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Solicitação atualizada com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Solicitação não encontrada."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao atualizar solicitação: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
 }
 
-// Stubs para outras funções que o app chama mas não foram fornecidas no código inicial
-function createEscalaAction(p) { return {sucesso: true}; }
-function updateEscalaAction(p) { return {sucesso: true}; }
-function updateFullEscalaAction(p) { return {sucesso: true}; }
-function updateSolicitacaoOldAction(p) { return {sucesso: true}; }
+
+// ============================================================
+// CRIAR RECADO
+// ============================================================
+
+function createRecado(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_RECADOS
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba RECADOS não encontrada."
+
+      };
+
+    }
+
+
+    var titulo =
+      safeString(p.titulo)
+        .trim();
+
+
+    var mensagem =
+      safeString(p.mensagem)
+        .trim();
+
+
+    if (
+      !titulo &&
+      !mensagem
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Informe o título ou a mensagem."
+
+      };
+
+    }
+
+
+    var imagem =
+      "";
+
+
+    var imageBase64 =
+      safeString(
+        p.imageBase64 ||
+        p.imagemBase64
+      );
+
+
+    if (
+      imageBase64
+    ) {
+
+      imagem =
+        saveImageToDrive(
+          imageBase64
+        );
+
+    }
+
+    else if (
+      p.imagemUrl !== undefined &&
+      p.imagemUrl !== null
+    ) {
+
+      imagem =
+        safeString(
+          p.imagemUrl
+        );
+
+    }
+
+
+    var now =
+      new Date();
+
+
+    sheet.appendRow([
+
+      Utilities.getUuid(),
+
+      titulo,
+
+      mensagem,
+
+      imagem,
+
+      "SIM",
+
+      now,
+
+      now
+
+    ]);
+
+
+    criarNotificacaoParaTodos(
+
+      ss,
+
+      titulo ||
+      "Novo recado",
+
+      mensagem ||
+      "Um novo recado foi publicado.",
+
+      "RECADO"
+
+    );
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        "Recado publicado com sucesso."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao criar recado: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// ATUALIZAR RECADO
+// ============================================================
+
+function updateRecado(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_RECADOS
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba RECADOS não encontrada."
+
+      };
+
+    }
+
+
+    var id =
+      safeString(p.id)
+        .trim();
+
+
+    if (!id) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "ID do recado não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        compararId(
+          values[i][0],
+          id
+        )
+      ) {
+
+        var imagem =
+          safeString(
+            values[i][3]
+          );
+
+
+        var imageBase64 =
+          safeString(
+            p.imageBase64 ||
+            p.imagemBase64
+          );
+
+
+        if (
+          imageBase64
+        ) {
+
+          imagem =
+            saveImageToDrive(
+              imageBase64
+            );
+
+        }
+
+        else if (
+          p.imagemUrl !== undefined &&
+          p.imagemUrl !== null
+        ) {
+
+          imagem =
+            safeString(
+              p.imagemUrl
+            );
+
+        }
+
+
+        var ativo =
+          safeString(
+            values[i][4]
+          );
+
+
+        if (
+          p.ativo !== undefined &&
+          p.ativo !== null
+        ) {
+
+          ativo =
+            safeString(
+              p.ativo
+            );
+
+        }
+
+
+        sheet
+          .getRange(
+            i + 1,
+            2,
+            1,
+            4
+          )
+          .setValues([[
+
+            safeString(p.titulo),
+
+            safeString(p.mensagem),
+
+            imagem,
+
+            ativo
+
+          ]]);
+
+
+        sheet
+          .getRange(
+            i + 1,
+            7
+          )
+          .setValue(
+            new Date()
+          );
+
+
+        criarNotificacaoParaTodos(
+
+          ss,
+
+          "Recado atualizado",
+
+          safeString(p.titulo) ||
+          "Um recado foi atualizado.",
+
+          "RECADO"
+
+        );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Recado atualizado com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Recado não encontrado."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao atualizar recado: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// EXCLUIR RECADO
+// ============================================================
+
+function deleteRecado(p) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_RECADOS
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba RECADOS não encontrada."
+
+      };
+
+    }
+
+
+    var id =
+      safeString(p.id)
+        .trim();
+
+
+    if (!id) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "ID do recado não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        compararId(
+          values[i][0],
+          id
+        )
+      ) {
+
+        sheet.deleteRow(
+          i + 1
+        );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Recado excluído com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Recado não encontrado."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao excluir recado: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// ============================================================
+// NOTIFICAÇÕES
+// ============================================================
+// ============================================================
+
+
+// ============================================================
+// CABEÇALHO PADRÃO
+// ============================================================
+
+function cabecalhoNotificacoes() {
+
+  return [
+
+    "ID",
+    "DESTINATARIO",
+    "TITULO",
+    "MENSAGEM",
+    "TIPO",
+    "DATA",
+    "LIDA"
+
+  ];
+
+}
+
+
+// ============================================================
+// OBTER/CRIAR ABA
+// ============================================================
+
+function obterAbaNotificacoes(ss) {
+
+  var sheet =
+    getSheetSecure(
+      ss,
+      ABA_NOTIFICACOES
+    );
+
+
+  if (!sheet) {
+
+    sheet =
+      ss.insertSheet(
+        ABA_NOTIFICACOES
+      );
+
+  }
+
+
+  if (
+    sheet.getLastRow() === 0
+  ) {
+
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        7
+      )
+      .setValues([
+        cabecalhoNotificacoes()
+      ]);
+
+  }
+
+
+  garantirEstruturaNotificacoes(
+    sheet
+  );
+
+
+  return sheet;
+
+}
+
+
+// ============================================================
+// NORMALIZAR CABEÇALHOS
+// ============================================================
+
+function obterCabecalhosNotificacao(
+  sheet
+) {
+
+  var lastColumn =
+    sheet.getLastColumn();
+
+
+  if (
+    lastColumn <= 0
+  ) {
+
+    return [];
+
+  }
+
+
+  var headers =
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        lastColumn
+      )
+      .getValues()[0];
+
+
+  return headers.map(
+    function(header) {
+
+      return normalizarTexto(
+        header
+      ).replace(
+        /\s+/g,
+        "_"
+      );
+
+    }
+  );
+
+}
+
+
+// ============================================================
+// GARANTIR ESTRUTURA
+// ============================================================
+
+function garantirEstruturaNotificacoes(
+  sheet
+) {
+
+  var obrigatorios = [
+
+    "id",
+    "destinatario",
+    "titulo",
+    "mensagem",
+    "tipo",
+    "data",
+    "lida"
+
+  ];
+
+
+  var headers =
+    obterCabecalhosNotificacao(
+      sheet
+    );
+
+
+  for (
+    var i = 0;
+    i < obrigatorios.length;
+    i++
+  ) {
+
+    if (
+      headers.indexOf(
+        obrigatorios[i]
+      ) === -1
+    ) {
+
+      var novaColuna =
+        sheet.getLastColumn() + 1;
+
+
+      sheet
+        .getRange(
+          1,
+          novaColuna
+        )
+        .setValue(
+          obrigatorios[i].toUpperCase()
+        );
+
+
+      headers =
+        obterCabecalhosNotificacao(
+          sheet
+        );
+
+    }
+
+  }
+
+}
+
+
+// ============================================================
+// LOCALIZAR COLUNA
+// ============================================================
+
+function colunaNotificacao(
+  headers,
+  nome
+) {
+
+  var indice =
+    headers.indexOf(
+      nome
+    );
+
+
+  return (
+    indice >= 0
+      ? indice + 1
+      : -1
+  );
+
+}
+
+
+// ============================================================
+// CRIAR NOTIFICAÇÃO
+// ============================================================
+
+function criarNotificacao(
+  ss,
+  destinatario,
+  titulo,
+  mensagem,
+  tipo
+) {
+
+  var lock =
+    LockService.getScriptLock();
+
+
+  try {
+
+    lock.waitLock(10000);
+
+
+    destinatario =
+      safeString(
+        destinatario
+      ).trim();
+
+
+    titulo =
+      safeString(
+        titulo
+      ).trim();
+
+
+    mensagem =
+      safeString(
+        mensagem
+      ).trim();
+
+
+    tipo =
+      safeString(
+        tipo
+      ).trim();
+
+
+    if (!destinatario) {
+      return false;
+    }
+
+
+    var sheet =
+      obterAbaNotificacoes(
+        ss
+      );
+
+
+    garantirEstruturaNotificacoes(
+      sheet
+    );
+
+
+    var headers =
+      obterCabecalhosNotificacao(
+        sheet
+      );
+
+
+    // --------------------------------------------------------
+    // EVITAR DUPLICAÇÃO RECENTE
+    // --------------------------------------------------------
+
+    if (
+      notificacaoDuplicada(
+        sheet,
+        destinatario,
+        titulo,
+        mensagem
+      )
+    ) {
+
+      return false;
+
+    }
+
+
+    var row =
+      new Array(
+        sheet.getLastColumn()
+      );
+
+
+    for (
+      var i = 0;
+      i < row.length;
+      i++
+    ) {
+
+      row[i] = "";
+
+    }
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "id",
+      Utilities.getUuid()
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "destinatario",
+      destinatario
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "titulo",
+      titulo
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "mensagem",
+      mensagem
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "tipo",
+      tipo
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "data",
+      new Date()
+    );
+
+
+    definirValorColuna(
+      row,
+      headers,
+      "lida",
+      "NAO"
+    );
+
+
+    sheet.appendRow(
+      row
+    );
+
+
+    return true;
+
+
+  } catch (error) {
+
+    Logger.log(
+      "Erro ao criar notificação: " +
+      safeErrorMessage(error)
+    );
+
+
+    return false;
+
+
+  } finally {
+
+    try {
+      lock.releaseLock();
+    } catch (e) {}
+
+  }
+
+}
+
+
+// ============================================================
+// DEFINIR VALOR
+// ============================================================
+
+function definirValorColuna(
+  row,
+  headers,
+  coluna,
+  valor
+) {
+
+  var index =
+    headers.indexOf(
+      coluna
+    );
+
+
+  if (
+    index >= 0
+  ) {
+
+    row[index] =
+      valor;
+
+  }
+
+}
+
+
+// ============================================================
+// VERIFICAR DUPLICAÇÃO
+// ============================================================
+
+function notificacaoDuplicada(
+  sheet,
+  destinatario,
+  titulo,
+  mensagem
+) {
+
+  if (
+    sheet.getLastRow() <= 1
+  ) {
+
+    return false;
+
+  }
+
+
+  var headers =
+    obterCabecalhosNotificacao(
+      sheet
+    );
+
+
+  var colDest =
+    headers.indexOf(
+      "destinatario"
+    );
+
+
+  var colTitulo =
+    headers.indexOf(
+      "titulo"
+    );
+
+
+  var colMensagem =
+    headers.indexOf(
+      "mensagem"
+    );
+
+
+  if (
+    colDest < 0 ||
+    colTitulo < 0 ||
+    colMensagem < 0
+  ) {
+
+    return false;
+
+  }
+
+
+  var values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  // Apenas notificações recentes.
+  // Evita deixar a planilha pesada.
+
+  var inicio =
+    Math.max(
+      1,
+      values.length - 20
+    );
+
+
+  for (
+    var i = inicio;
+    i < values.length;
+    i++
+  ) {
+
+    if (
+
+      normalizarTexto(
+        values[i][colDest]
+      ) ===
+      normalizarTexto(
+        destinatario
+      )
+
+      &&
+
+      safeString(
+        values[i][colTitulo]
+      ).trim() ===
+      safeString(
+        titulo
+      ).trim()
+
+      &&
+
+      safeString(
+        values[i][colMensagem]
+      ).trim() ===
+      safeString(
+        mensagem
+      ).trim()
+
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+// ============================================================
+// NOTIFICAR TODOS
+// ============================================================
+
+function criarNotificacaoParaTodos(
+  ss,
+  titulo,
+  mensagem,
+  tipo
+) {
+
+  var integrantes =
+    getSheetData(
+      ss,
+      ABA_INTEGRANTES,
+      mapIntegrante
+    );
+
+
+  var quantidade =
+    0;
+
+
+  for (
+    var i = 0;
+    i < integrantes.length;
+    i++
+  ) {
+
+    var nome =
+      safeString(
+        integrantes[i].nome
+      ).trim();
+
+
+    if (!nome) {
+      continue;
+    }
+
+
+    if (
+      criarNotificacao(
+        ss,
+        nome,
+        titulo,
+        mensagem,
+        tipo
+      )
+    ) {
+
+      quantidade++;
+
+    }
+
+  }
+
+
+  return quantidade;
+
+}
+
+
+// ============================================================
+// NOTIFICAR LÍDERES
+// ============================================================
+
+function criarNotificacaoParaLideres(
+  ss,
+  titulo,
+  mensagem,
+  tipo
+) {
+
+  var integrantes =
+    getSheetData(
+      ss,
+      ABA_INTEGRANTES,
+      mapIntegrante
+    );
+
+
+  var quantidade =
+    0;
+
+
+  for (
+    var i = 0;
+    i < integrantes.length;
+    i++
+  ) {
+
+    var funcao =
+      normalizarTexto(
+        integrantes[i].funcao
+      );
+
+
+    if (
+      funcao.indexOf("lider") === -1
+    ) {
+
+      continue;
+
+    }
+
+
+    var nome =
+      safeString(
+        integrantes[i].nome
+      ).trim();
+
+
+    if (!nome) {
+      continue;
+    }
+
+
+    if (
+      criarNotificacao(
+        ss,
+        nome,
+        titulo,
+        mensagem,
+        tipo
+      )
+    ) {
+
+      quantidade++;
+
+    }
+
+  }
+
+
+  return quantidade;
+
+}
+
+
+// ============================================================
+// GET NOTIFICAÇÕES
+// ============================================================
+
+function getNotificacoes(params) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_NOTIFICACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Nenhuma notificação encontrada.",
+
+        notificacoes: []
+
+      };
+
+    }
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Nome do usuário não informado.",
+
+        notificacoes: []
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    if (
+      values.length <= 1
+    ) {
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Nenhuma notificação encontrada.",
+
+        notificacoes: []
+
+      };
+
+    }
+
+
+    var headers =
+      values[0].map(
+        function(header) {
+
+          return normalizarTexto(
+            header
+          ).replace(
+            /\s+/g,
+            "_"
+          );
+
+        }
+      );
+
+
+    var colId =
+      headers.indexOf("id");
+
+
+    var colDestinatario =
+      headers.indexOf(
+        "destinatario"
+      );
+
+
+    var colTitulo =
+      headers.indexOf("titulo");
+
+
+    var colMensagem =
+      headers.indexOf("mensagem");
+
+
+    var colTipo =
+      headers.indexOf("tipo");
+
+
+    var colData =
+      headers.indexOf("data");
+
+
+    var colLida =
+      headers.indexOf("lida");
+
+
+    if (
+      colDestinatario < 0
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "A coluna DESTINATARIO não foi encontrada na aba NOTIFICACOES.",
+
+        notificacoes: []
+
+      };
+
+    }
+
+
+    var notificacoes = [];
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      var row =
+        values[i];
+
+
+      var destinatario =
+        safeString(
+          row[colDestinatario]
+        ).trim();
+
+
+      if (
+        normalizarTexto(
+          destinatario
+        ) !==
+        normalizarTexto(nome)
+      ) {
+
+        continue;
+
+      }
+
+
+      var dataFormatada =
+        formatDateISO(
+          colData >= 0
+            ? row[colData]
+            : ""
+        );
+
+
+      notificacoes.push({
+
+        id:
+          colId >= 0
+            ? safeString(
+                row[colId]
+              )
+            : "",
+
+        destinatario:
+          destinatario,
+
+        titulo:
+          colTitulo >= 0
+            ? safeString(
+                row[colTitulo]
+              )
+            : "",
+
+        mensagem:
+          colMensagem >= 0
+            ? safeString(
+                row[colMensagem]
+              )
+            : "",
+
+        tipo:
+          colTipo >= 0
+            ? safeString(
+                row[colTipo]
+              )
+            : "",
+
+        data:
+          dataFormatada,
+
+        lida:
+          colLida >= 0
+            ? (
+                safeString(
+                  row[colLida]
+                ).trim() ||
+                "NAO"
+              )
+            : "NAO"
+
+      });
+
+    }
+
+
+    // Mais recentes primeiro.
+
+    notificacoes.reverse();
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        notificacoes.length +
+        " notificação(ões) encontrada(s).",
+
+      notificacoes:
+        notificacoes
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao buscar notificações: " +
+        safeErrorMessage(error),
+
+      notificacoes: []
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// MARCAR UMA COMO LIDA
+// ============================================================
+
+function marcarNotificacaoLida(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_NOTIFICACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba NOTIFICACOES não encontrada."
+
+      };
+
+    }
+
+
+    var id =
+      safeString(
+        params.id
+      ).trim();
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!id) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "ID da notificação não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    if (
+      values.length <= 1
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Nenhuma notificação encontrada."
+
+      };
+
+    }
+
+
+    var headers =
+      values[0].map(
+        function(header) {
+
+          return normalizarTexto(
+            header
+          ).replace(
+            /\s+/g,
+            "_"
+          );
+
+        }
+      );
+
+
+    var colId =
+      headers.indexOf("id");
+
+
+    var colDest =
+      headers.indexOf(
+        "destinatario"
+      );
+
+
+    var colLida =
+      headers.indexOf("lida");
+
+
+    if (
+      colId < 0 ||
+      colLida < 0
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Estrutura da aba NOTIFICACOES inválida."
+
+      };
+
+    }
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        !compararId(
+          values[i][colId],
+          id
+        )
+      ) {
+
+        continue;
+
+      }
+
+
+      // ------------------------------------------------------
+      // SEGURANÇA
+      // ------------------------------------------------------
+
+      if (
+        nome &&
+        colDest >= 0
+      ) {
+
+        if (
+          normalizarTexto(
+            values[i][colDest]
+          ) !==
+          normalizarTexto(nome)
+        ) {
+
+          return {
+
+            sucesso: false,
+
+            mensagem:
+              "Notificação não pertence ao usuário informado."
+
+          };
+
+        }
+
+      }
+
+
+      sheet
+        .getRange(
+          i + 1,
+          colLida + 1
+        )
+        .setValue(
+          "SIM"
+        );
+
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Notificação marcada como lida."
+
+      };
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Notificação não encontrada."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao marcar notificação: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// MARCAR TODAS COMO LIDAS
+// ============================================================
+
+function marcarTodasNotificacoesLidas(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_NOTIFICACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba NOTIFICACOES não encontrada."
+
+      };
+
+    }
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Nome do usuário não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    if (
+      values.length <= 1
+    ) {
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Nenhuma notificação para atualizar."
+
+      };
+
+    }
+
+
+    var headers =
+      values[0].map(
+        function(header) {
+
+          return normalizarTexto(
+            header
+          ).replace(
+            /\s+/g,
+            "_"
+          );
+
+        }
+      );
+
+
+    var colDest =
+      headers.indexOf(
+        "destinatario"
+      );
+
+
+    var colLida =
+      headers.indexOf(
+        "lida"
+      );
+
+
+    if (
+      colDest < 0 ||
+      colLida < 0
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Estrutura da aba NOTIFICACOES inválida."
+
+      };
+
+    }
+
+
+    var quantidade =
+      0;
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+
+        normalizarTexto(
+          values[i][colDest]
+        ) ===
+        normalizarTexto(nome)
+
+      ) {
+
+        if (
+
+          normalizarTexto(
+            values[i][colLida]
+          ) !== "sim"
+
+        ) {
+
+          sheet
+            .getRange(
+              i + 1,
+              colLida + 1
+            )
+            .setValue(
+              "SIM"
+            );
+
+
+          quantidade++;
+
+        }
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        quantidade +
+        " notificação(ões) marcada(s) como lida(s)."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao marcar notificações: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// EXCLUIR NOTIFICAÇÃO
+// ============================================================
+
+function deleteNotificacao(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_NOTIFICACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba NOTIFICACOES não encontrada."
+
+      };
+
+    }
+
+
+    var id =
+      safeString(
+        params.id
+      ).trim();
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!id) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "ID da notificação não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    if (
+      values.length <= 1
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Notificação não encontrada."
+
+      };
+
+    }
+
+
+    var headers =
+      values[0].map(
+        function(header) {
+
+          return normalizarTexto(
+            header
+          ).replace(
+            /\s+/g,
+            "_"
+          );
+
+        }
+      );
+
+
+    var colId =
+      headers.indexOf("id");
+
+
+    var colDest =
+      headers.indexOf(
+        "destinatario"
+      );
+
+
+    if (
+      colId < 0
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Coluna ID não encontrada."
+
+      };
+
+    }
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+        !compararId(
+          values[i][colId],
+          id
+        )
+      ) {
+
+        continue;
+
+      }
+
+
+      // Segurança: se nome for informado,
+      // somente o dono pode excluir.
+
+      if (
+        nome &&
+        colDest >= 0 &&
+        normalizarTexto(
+          values[i][colDest]
+        ) !==
+        normalizarTexto(nome)
+      ) {
+
+        return {
+
+          sucesso: false,
+
+          mensagem:
+            "Notificação não pertence ao usuário informado."
+
+        };
+
+      }
+
+
+      sheet.deleteRow(
+        i + 1
+      );
+
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Notificação excluída."
+
+      };
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Notificação não encontrada."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao excluir notificação: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// LIMPAR NOTIFICAÇÕES LIDAS
+// ============================================================
+
+function limparNotificacoesLidas(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_NOTIFICACOES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba NOTIFICACOES não encontrada."
+
+      };
+
+    }
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Nome do usuário não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    if (
+      values.length <= 1
+    ) {
+
+      return {
+
+        sucesso: true,
+
+        mensagem:
+          "Nenhuma notificação encontrada."
+
+      };
+
+    }
+
+
+    var headers =
+      values[0].map(
+        function(header) {
+
+          return normalizarTexto(
+            header
+          ).replace(
+            /\s+/g,
+            "_"
+          );
+
+        }
+      );
+
+
+    var colDest =
+      headers.indexOf(
+        "destinatario"
+      );
+
+
+    var colLida =
+      headers.indexOf(
+        "lida"
+      );
+
+
+    if (
+      colDest < 0 ||
+      colLida < 0
+    ) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Estrutura da aba NOTIFICACOES inválida."
+
+      };
+
+    }
+
+
+    var removidas =
+      0;
+
+
+    // Sempre de baixo para cima.
+
+    for (
+      var i = values.length - 1;
+      i >= 1;
+      i--
+    ) {
+
+      if (
+
+        normalizarTexto(
+          values[i][colDest]
+        ) ===
+        normalizarTexto(nome)
+
+        &&
+
+        normalizarTexto(
+          values[i][colLida]
+        ) ===
+        "sim"
+
+      ) {
+
+        sheet.deleteRow(
+          i + 1
+        );
+
+
+        removidas++;
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: true,
+
+      mensagem:
+        removidas +
+        " notificação(ões) removida(s)."
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao limpar notificações: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// TESTE DO SISTEMA
+// ============================================================
+
+function testarSistemaNotificacoesInterno(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Informe o nome para testar."
+
+      };
+
+    }
+
+
+    var criada =
+      criarNotificacao(
+
+        ss,
+
+        nome,
+
+        "Teste de notificação",
+
+        "Esta é uma notificação de teste do Escala de Louvor 2K26.",
+
+        "TESTE"
+
+      );
+
+
+    var resultado =
+      getNotificacoes({
+
+        nome: nome
+
+      });
+
+
+    return {
+
+      sucesso:
+        resultado.sucesso,
+
+      mensagem:
+        criada
+
+          ? "Notificação de teste criada."
+
+          : "Notificação semelhante já existia.",
+
+      notificacoes:
+        resultado.notificacoes || []
+
+    };
+
+
+  } catch (error) {
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro no teste: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
+
+// ============================================================
+// TESTE MANUAL - NOTIFICAÇÃO
+// ============================================================
+
+function testarGetNotificacoes() {
+
+  var nome =
+    "JACO";
+
+
+  Logger.log(
+    "========================================"
+  );
+
+  Logger.log(
+    "TESTE GET NOTIFICACOES"
+  );
+
+  Logger.log(
+    "========================================"
+  );
+
+
+  try {
+
+    var resultado =
+      getNotificacoes({
+
+        nome:
+          nome
+
+      });
+
+
+    Logger.log(
+      JSON.stringify(
+        resultado,
+        null,
+        2
+      )
+    );
+
+
+    Logger.log(
+      "Sucesso: " +
+      resultado.sucesso
+    );
+
+
+    Logger.log(
+      "Mensagem: " +
+      resultado.mensagem
+    );
+
+
+    Logger.log(
+      "Quantidade: " +
+      (
+        resultado.notificacoes
+          ? resultado.notificacoes.length
+          : 0
+      )
+    );
+
+
+  } catch (error) {
+
+    Logger.log(
+      "ERRO:"
+    );
+
+
+    Logger.log(
+      safeErrorMessage(error)
+    );
+
+  }
+
+
+  Logger.log(
+    "========================================"
+  );
+
+}
+
+
+// ============================================================
+// TESTE COMPLETO DE NOTIFICAÇÃO
+// ============================================================
+
+function testarNotificacaoCompleta() {
+
+  var nome =
+    "JACO";
+
+
+  Logger.log(
+    "=========================================="
+  );
+
+  Logger.log(
+    "TESTE COMPLETO DO SISTEMA DE NOTIFICAÇÕES"
+  );
+
+  Logger.log(
+    "=========================================="
+  );
+
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    Logger.log(
+      "1. Planilha acessada com sucesso."
+    );
+
+
+    var sheet =
+      obterAbaNotificacoes(
+        ss
+      );
+
+
+    Logger.log(
+      "2. Aba NOTIFICACOES OK."
+    );
+
+
+    garantirEstruturaNotificacoes(
+      sheet
+    );
+
+
+    Logger.log(
+      "3. Estrutura da aba OK."
+    );
+
+
+    var criada =
+      criarNotificacao(
+
+        ss,
+
+        nome,
+
+        "Teste manual",
+
+        "Se esta mensagem apareceu, a criação de notificações está funcionando.",
+
+        "TESTE"
+
+      );
+
+
+    Logger.log(
+      "4. Notificação criada: " +
+      criada
+    );
+
+
+    var resultado =
+      getNotificacoes({
+
+        nome:
+          nome
+
+      });
+
+
+    Logger.log(
+      "5. Quantidade encontrada: " +
+      resultado.notificacoes.length
+    );
+
+
+    Logger.log(
+      JSON.stringify(
+        resultado,
+        null,
+        2
+      )
+    );
+
+
+  } catch (error) {
+
+    Logger.log(
+      "ERRO:"
+    );
+
+
+    Logger.log(
+      safeErrorMessage(error)
+    );
+
+  }
+
+
+  Logger.log(
+    "=========================================="
+  );
+
+}
+
+
+// ============================================================
+// TESTE - MARCAR COMO LIDA
+// ============================================================
+
+function testarMarcarNotificacaoLida() {
+
+  var nome =
+    "JACO";
+
+
+  try {
+
+    var resultado =
+      getNotificacoes({
+
+        nome:
+          nome
+
+      });
+
+
+    if (
+      !resultado.sucesso ||
+      !resultado.notificacoes ||
+      resultado.notificacoes.length === 0
+    ) {
+
+      Logger.log(
+        "Nenhuma notificação encontrada para teste."
+      );
+
+      return;
+
+    }
+
+
+    var notificacao =
+      resultado.notificacoes[0];
+
+
+    Logger.log(
+      "ID testado: " +
+      notificacao.id
+    );
+
+
+    var resposta =
+      marcarNotificacaoLida({
+
+        id:
+          notificacao.id,
+
+        nome:
+          nome
+
+      });
+
+
+    Logger.log(
+      JSON.stringify(
+        resposta,
+        null,
+        2
+      )
+    );
+
+
+  } catch (error) {
+
+    Logger.log(
+      "ERRO: " +
+      safeErrorMessage(error)
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// GOOGLE DRIVE
+// ============================================================
+
+function saveImageToDrive(
+  base64Data
+) {
+
+  if (!base64Data) {
+    return "";
+  }
+
+
+  try {
+
+    var original =
+      String(
+        base64Data
+      );
+
+
+    var contentType =
+      "image/jpeg";
+
+
+    var mimeMatch =
+      original.match(
+        /^data:(image\/[a-zA-Z0-9.+-]+);base64,/
+      );
+
+
+    if (
+      mimeMatch
+    ) {
+
+      contentType =
+        mimeMatch[1];
+
+    }
+
+
+    var cleanBase64 =
+      original.replace(
+        /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
+        ""
+      );
+
+
+    var folder =
+      DriveApp.getFolderById(
+        FOLDER_ID
+      );
+
+
+    var extension =
+      "jpg";
+
+
+    if (
+      contentType === "image/png"
+    ) {
+
+      extension =
+        "png";
+
+    }
+
+    else if (
+      contentType === "image/webp"
+    ) {
+
+      extension =
+        "webp";
+
+    }
+
+    else if (
+      contentType === "image/gif"
+    ) {
+
+      extension =
+        "gif";
+
+    }
+
+
+    var blob =
+      Utilities.newBlob(
+
+        Utilities.base64Decode(
+          cleanBase64
+        ),
+
+        contentType,
+
+        "recado_" +
+        new Date().getTime() +
+        "." +
+        extension
+
+      );
+
+
+    var file =
+      folder.createFile(
+        blob
+      );
+
+
+    // Compartilhamento é tentado,
+    // mas não impede o upload caso
+    // a política do Drive bloqueie.
+
+    try {
+
+      file.setSharing(
+
+        DriveApp.Access.ANYONE_WITH_LINK,
+
+        DriveApp.Permission.VIEW
+
+      );
+
+    } catch (sharingError) {
+
+      Logger.log(
+
+        "Aviso ao compartilhar arquivo: " +
+        safeErrorMessage(
+          sharingError
+        )
+
+      );
+
+    }
+
+
+    return (
+      "https://drive.google.com/uc?export=view&id=" +
+      file.getId()
+    );
+
+
+  } catch (error) {
+
+    throw new Error(
+
+      "Erro ao salvar imagem no Google Drive: " +
+      safeErrorMessage(error)
+
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// TESTE DRIVE
+// ============================================================
+
+function testarCriacaoArquivoDrive() {
+
+  try {
+
+    var folder =
+      DriveApp.getFolderById(
+        FOLDER_ID
+      );
+
+
+    var blob =
+      Utilities.newBlob(
+
+        "Teste de upload - " +
+        new Date(),
+
+        "text/plain",
+
+        "teste_recado.txt"
+
+      );
+
+
+    var file =
+      folder.createFile(
+        blob
+      );
+
+
+    Logger.log(
+      "OK - arquivo criado"
+    );
+
+
+    Logger.log(
+      "Nome: " +
+      file.getName()
+    );
+
+
+    Logger.log(
+      "ID: " +
+      file.getId()
+    );
+
+
+    Logger.log(
+      "URL: " +
+      file.getUrl()
+    );
+
+
+  } catch (error) {
+
+    Logger.log(
+      "ERRO AO CRIAR ARQUIVO:"
+    );
+
+
+    Logger.log(
+      safeErrorMessage(error)
+    );
+
+
+  }
+
+}
+
+
+// ============================================================
+// TESTE COMPARTILHAMENTO DRIVE
+// ============================================================
+
+function testarCompartilhamentoDrive() {
+
+  try {
+
+    var folder =
+      DriveApp.getFolderById(
+        FOLDER_ID
+      );
+
+
+    var blob =
+      Utilities.newBlob(
+
+        "Teste de compartilhamento",
+
+        "text/plain",
+
+        "teste_compartilhamento.txt"
+
+      );
+
+
+    var file =
+      folder.createFile(
+        blob
+      );
+
+
+    Logger.log(
+      "Arquivo criado: " +
+      file.getId()
+    );
+
+
+    file.setSharing(
+
+      DriveApp.Access.ANYONE_WITH_LINK,
+
+      DriveApp.Permission.VIEW
+
+    );
+
+
+    Logger.log(
+      "COMPARTILHAMENTO ALTERADO COM SUCESSO"
+    );
+
+
+    Logger.log(
+      "URL: " +
+      file.getUrl()
+    );
+
+
+  } catch (error) {
+
+    Logger.log(
+      "ERRO:"
+    );
+
+
+    Logger.log(
+      safeErrorMessage(error)
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// AUXILIARES DE SOLICITAÇÃO
+// ============================================================
+
+function obterIdSolicitacao(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return safeString(
+      row[0]
+    ).trim();
+
+  }
+
+
+  return "";
+
+}
+
+
+// ============================================================
+
+function obterDataSolicitacao(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return row[1];
+
+  }
+
+
+  return row[0];
+
+}
+
+
+// ============================================================
+
+function obterQuemPediu(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return safeString(
+      row[2]
+    );
+
+  }
+
+
+  return safeString(
+    row[1]
+  );
+
+}
+
+
+// ============================================================
+
+function obterFuncaoSolicitacao(row) {
+
+  if (
+    !row ||
+    row.length < 8
+  ) {
+
+    return "";
+
+  }
+
+
+  return safeString(
+    row[3]
+  );
+
+}
+
+
+// ============================================================
+
+function obterInstrumentoSolicitacao(row) {
+
+  if (
+    !row ||
+    row.length < 8
+  ) {
+
+    return "";
+
+  }
+
+
+  return safeString(
+    row[4]
+  );
+
+}
+
+
+// ============================================================
+
+function obterSubstituto(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return safeString(
+      row[5]
+    );
+
+  }
+
+
+  return safeString(
+    row[2]
+  );
+
+}
+
+
+// ============================================================
+
+function obterMotivoSolicitacao(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return safeString(
+      row[6]
+    );
+
+  }
+
+
+  return safeString(
+    row[3]
+  );
+
+}
+
+
+// ============================================================
+
+function obterStatusSolicitacao(row) {
+
+  if (!row) {
+    return "";
+  }
+
+
+  if (
+    row.length >= 8
+  ) {
+
+    return safeString(
+      row[7]
+    )
+      .trim()
+      .toUpperCase();
+
+  }
+
+
+  return safeString(
+    row[4]
+  )
+    .trim()
+    .toUpperCase();
+
+}
+
+
+// ============================================================
+// NOME
+// ============================================================
+
+function contemNome(
+  texto,
+  nome
+) {
+
+  var textoNormalizado =
+    normalizarTexto(
+      texto
+    );
+
+
+  var nomeNormalizado =
+    normalizarTexto(
+      nome
+    );
+
+
+  if (
+    !textoNormalizado ||
+    !nomeNormalizado
+  ) {
+
+    return false;
+
+  }
+
+
+  return (
+    textoNormalizado.indexOf(
+      nomeNormalizado
+    ) !== -1
+  );
+
+}
+
+
+// ============================================================
+// SUBSTITUIR NOME
+// ============================================================
+
+function substituirNome(
+  texto,
+  nomeAntigo,
+  nomeNovo
+) {
+
+  if (
+    !nomeAntigo
+  ) {
+
+    return safeString(
+      texto
+    );
+
+  }
+
+
+  var regex =
+    new RegExp(
+      escapeRegExp(
+        nomeAntigo
+      ),
+      "gi"
+    );
+
+
+  return safeString(
+    texto
+  ).replace(
+    regex,
+    nomeNovo
+  );
+
+}
+
+
+// ============================================================
+// ESCAPAR REGEX
+// ============================================================
+
+function escapeRegExp(
+  texto
+) {
+
+  return String(
+    texto
+  ).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
+  );
+
+}
+
+
+// ============================================================
+// COMPARAR ID
+// ============================================================
+
+function compararId(
+  idA,
+  idB
+) {
+
+  return (
+
+    safeString(idA)
+      .trim()
+
+    ===
+
+    safeString(idB)
+      .trim()
+
+  );
+
+}
+
+
+// ============================================================
+// COMPARAÇÃO DE DATAS
+// ============================================================
+
+function sameDate(
+  sheetValue,
+  receivedValue
+) {
+
+  if (
+    sheetValue === null ||
+    sheetValue === undefined ||
+    receivedValue === null ||
+    receivedValue === undefined
+  ) {
+
+    return false;
+
+  }
+
+
+  var recebido =
+    parseDateOnly(
+      receivedValue
+    );
+
+
+  var planilha =
+    parseDateOnly(
+      sheetValue
+    );
+
+
+  if (
+    !recebido ||
+    !planilha
+  ) {
+
+    return (
+
+      normalizarTexto(
+        sheetValue
+      ) ===
+      normalizarTexto(
+        receivedValue
+      )
+
+    );
+
+  }
+
+
+  return (
+
+    planilha.year ===
+    recebido.year
+
+    &&
+
+    planilha.month ===
+    recebido.month
+
+    &&
+
+    planilha.day ===
+    recebido.day
+
+  );
+
+}
+
+
+// ============================================================
+// PARSE DE DATA SEM ERRO DE FUSO
+// ============================================================
+
+function parseDateOnly(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return null;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Date real
+  // ----------------------------------------------------------
+
+  if (
+    Object.prototype.toString.call(
+      value
+    ) ===
+    "[object Date]"
+  ) {
+
+    if (
+      isNaN(
+        value.getTime()
+      )
+    ) {
+
+      return null;
+
+    }
+
+
+    return {
+
+      year:
+        Number(
+          Utilities.formatDate(
+            value,
+            "GMT-3",
+            "yyyy"
+          )
+        ),
+
+      month:
+        Number(
+          Utilities.formatDate(
+            value,
+            "GMT-3",
+            "MM"
+          )
+        ),
+
+      day:
+        Number(
+          Utilities.formatDate(
+            value,
+            "GMT-3",
+            "dd"
+          )
+        )
+
+    };
+
+  }
+
+
+  var texto =
+    safeString(
+      value
+    ).trim();
+
+
+  // dd/MM/yyyy
+
+  var br =
+    texto.match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+    );
+
+
+  if (br) {
+
+    return {
+
+      year:
+        Number(br[3]),
+
+      month:
+        Number(br[2]),
+
+      day:
+        Number(br[1])
+
+    };
+
+  }
+
+
+  // yyyy-MM-dd
+
+  var iso =
+    texto.match(
+      /^(\d{4})-(\d{2})-(\d{2})/
+    );
+
+
+  if (iso) {
+
+    return {
+
+      year:
+        Number(iso[1]),
+
+      month:
+        Number(iso[2]),
+
+      day:
+        Number(iso[3])
+
+    };
+
+  }
+
+
+  return null;
+
+}
+
+
+// ============================================================
+// NORMALIZAÇÃO DE TEXTO
+// ============================================================
+
+function normalizarTexto(
+  txt
+) {
+
+  if (
+    txt === null ||
+    txt === undefined
+  ) {
+
+    return "";
+
+  }
+
+
+  return txt
+    .toString()
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /\s+/g,
+      " "
+    );
+
+}
+
+
+// ============================================================
+// STRING SEGURA
+// ============================================================
+
+function safeString(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+
+    return "";
+
+  }
+
+
+  return String(
+    value
+  );
+
+}
+
+
+// ============================================================
+// ERRO
+// ============================================================
+
+function safeErrorMessage(
+  error
+) {
+
+  try {
+
+    if (!error) {
+
+      return "Erro desconhecido.";
+
+    }
+
+
+    if (
+      error.message
+    ) {
+
+      return String(
+        error.message
+      );
+
+    }
+
+
+    return String(
+      error
+    );
+
+
+  } catch (e) {
+
+    return "Erro desconhecido.";
+
+  }
+
+}
+
+
+// ============================================================
+// DATA BR
+// ============================================================
+
+function formatDateBR(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return "";
+
+  }
+
+
+  try {
+
+    // Date real
+
+    if (
+      Object.prototype.toString.call(
+        value
+      ) ===
+      "[object Date]"
+    ) {
+
+      if (
+        isNaN(
+          value.getTime()
+        )
+      ) {
+
+        return "";
+
+      }
+
+
+      return Utilities.formatDate(
+
+        value,
+
+        "GMT-3",
+
+        "dd/MM/yyyy"
+
+      );
+
+    }
+
+
+    var texto =
+      safeString(
+        value
+      ).trim();
+
+
+    // Já está em formato BR.
+
+    if (
+      /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(
+        texto
+      )
+    ) {
+
+      var partes =
+        texto.split("/");
+
+
+      return (
+
+        ("0" +
+          partes[0]
+        ).slice(-2)
+
+        +
+
+        "/" +
+
+        ("0" +
+          partes[1]
+        ).slice(-2)
+
+        +
+
+        "/" +
+
+        partes[2]
+
+      );
+
+    }
+
+
+    // ISO.
+
+    var date =
+      new Date(
+        texto
+      );
+
+
+    if (
+      isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return texto;
+
+    }
+
+
+    return Utilities.formatDate(
+
+      date,
+
+      "GMT-3",
+
+      "dd/MM/yyyy"
+
+    );
+
+
+  } catch (error) {
+
+    return safeString(
+      value
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// DATA/HORA BR
+// ============================================================
+
+function formatDateTimeBR(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return "";
+
+  }
+
+
+  try {
+
+    if (
+      Object.prototype.toString.call(
+        value
+      ) ===
+      "[object Date]"
+    ) {
+
+      if (
+        isNaN(
+          value.getTime()
+        )
+      ) {
+
+        return "";
+
+      }
+
+
+      return Utilities.formatDate(
+
+        value,
+
+        "GMT-3",
+
+        "dd/MM/yyyy HH:mm"
+
+      );
+
+    }
+
+
+    var date =
+      new Date(
+        value
+      );
+
+
+    if (
+      isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return safeString(
+        value
+      );
+
+    }
+
+
+    return Utilities.formatDate(
+
+      date,
+
+      "GMT-3",
+
+      "dd/MM/yyyy HH:mm"
+
+    );
+
+
+  } catch (error) {
+
+    return safeString(
+      value
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// DATA ISO PARA O ANDROID
+// ============================================================
+
+function formatDateISO(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+
+    return "";
+
+  }
+
+
+  try {
+
+    if (
+      Object.prototype.toString.call(
+        value
+      ) ===
+      "[object Date]"
+    ) {
+
+      if (
+        isNaN(
+          value.getTime()
+        )
+      ) {
+
+        return "";
+
+      }
+
+
+      return value.toISOString();
+
+    }
+
+
+    var date =
+      new Date(
+        value
+      );
+
+
+    if (
+      isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return safeString(
+        value
+      );
+
+    }
+
+
+    return date.toISOString();
+
+
+  } catch (error) {
+
+    return safeString(
+      value
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// JSON
+// ============================================================
+
+function responseJSON(
+  obj
+) {
+
+  try {
+
+    return ContentService
+
+      .createTextOutput(
+        JSON.stringify(obj)
+      )
+
+      .setMimeType(
+        ContentService.MimeType.JSON
+      );
+
+
+  } catch (error) {
+
+    return ContentService
+
+      .createTextOutput(
+
+        JSON.stringify({
+
+          sucesso: false,
+
+          mensagem:
+            "Erro ao gerar resposta JSON."
+
+        })
+
+      )
+
+      .setMimeType(
+        ContentService.MimeType.JSON
+      );
+
+  }
+
+}
+
+
+// ============================================================
+// FIM DO BACKEND
+// ============================================================
