@@ -77,6 +77,10 @@ function doPost(e) {
 
 function handleRequest(e) {
 
+  // Zera o cache de abas a cada requisição, para nunca reaproveitar
+  // dados de uma execução anterior em instâncias "quentes".
+  _sheetSecureCache = null;
+
   var response = {
     sucesso: false,
     mensagem: "Erro inesperado no servidor."
@@ -183,6 +187,18 @@ function handleRequest(e) {
 
         response =
           limparNotificacoesLidas(params);
+
+        break;
+
+
+      // ======================================================
+      // FCM (TOKEN DE PUSH)
+      // ======================================================
+
+      case "atualizarTokenFcm":
+
+        response =
+          atualizarTokenFcm(params);
 
         break;
 
@@ -637,6 +653,12 @@ function getSheetData(
 // LOCALIZAR ABA DE FORMA ROBUSTA
 // ============================================================
 
+// Cache válido apenas durante a execução atual (uma chamada de
+// doGet/doPost). Evita repetir ss.getSheets() -- que busca os
+// metadados de TODAS as abas -- toda vez que uma função pede uma
+// aba específica. É zerado no início de handleRequest().
+var _sheetSecureCache = null;
+
 function getSheetSecure(
   ss,
   name
@@ -647,12 +669,29 @@ function getSheetSecure(
   }
 
 
+  if (!_sheetSecureCache) {
+    _sheetSecureCache = {};
+  }
+
+  var alvo =
+    normalizarTexto(name);
+
+  var chaveCache =
+    ss.getId() + "::" + alvo;
+
+  if (
+    Object.prototype.hasOwnProperty.call(_sheetSecureCache, chaveCache)
+  ) {
+    return _sheetSecureCache[chaveCache];
+  }
+
+
   var sheets =
     ss.getSheets();
 
 
-  var alvo =
-    normalizarTexto(name);
+  var encontrada =
+    null;
 
 
   for (
@@ -667,14 +706,17 @@ function getSheetSecure(
       ) === alvo
     ) {
 
-      return sheets[i];
+      encontrada = sheets[i];
+      break;
 
     }
 
   }
 
 
-  return null;
+  _sheetSecureCache[chaveCache] = encontrada;
+
+  return encontrada;
 
 }
 
@@ -863,10 +905,14 @@ function syncLinkLouvores(ss, dataEscala, louvoresJson) {
     };
   }
 
+  // Em vez de deleteRow() dentro de um loop (cada chamada reindexa
+  // a planilha), filtramos em memória as linhas que NÃO são desta
+  // data e depois regravamos tudo de uma vez.
   var values = sheet.getDataRange().getValues();
-  for (var i = values.length - 1; i >= 1; i--) {
-    if (sameDate(values[i][1], dataNormalizada)) {
-      sheet.deleteRow(i + 1);
+  var linhasMantidas = [];
+  for (var i = 1; i < values.length; i++) {
+    if (!sameDate(values[i][1], dataNormalizada)) {
+      linhasMantidas.push(values[i]);
     }
   }
 
@@ -894,9 +940,15 @@ function syncLinkLouvores(ss, dataEscala, louvoresJson) {
     ]);
   }
 
-  if (rows.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5)
-      .setValues(rows);
+  var totalFinal = linhasMantidas.concat(rows);
+
+  // Limpa o bloco de dados atual e regrava tudo (mantidas + novas)
+  // em uma única chamada, em vez de N deletes + 1 append.
+  if (values.length > 1) {
+    sheet.getRange(2, 1, values.length - 1, 5).clearContent();
+  }
+  if (totalFinal.length > 0) {
+    sheet.getRange(2, 1, totalFinal.length, 5).setValues(totalFinal);
   }
 
   return {
@@ -2952,62 +3004,26 @@ function atualizarStatusSolicitacao(
     sheet.getLastColumn();
 
 
-  // Estrutura completa
+  // Estrutura completa: monta um único array de valores para as
+  // colunas 8-11 (conforme disponíveis) e grava tudo em 1 chamada,
+  // em vez de até 4 chamadas setValue separadas.
   if (
     lastColumn >= 8
   ) {
 
-    sheet
-      .getRange(
-        rowIndex,
-        8
-      )
-      .setValue(
-        status
-      );
+    var linhaValores = [status, new Date()];
 
-
-    sheet
-      .getRange(
-        rowIndex,
-        9
-      )
-      .setValue(
-        new Date()
-      );
-
-
-    if (
-      lastColumn >= 10
-    ) {
-
-      sheet
-        .getRange(
-          rowIndex,
-          10
-        )
-        .setValue(
-          decididoPor
-        );
-
+    if (lastColumn >= 10) {
+      linhaValores.push(decididoPor);
     }
 
-
-    if (
-      lastColumn >= 11
-    ) {
-
-      sheet
-        .getRange(
-          rowIndex,
-          11
-        )
-        .setValue(
-          motivo
-        );
-
+    if (lastColumn >= 11) {
+      linhaValores.push(motivo);
     }
 
+    sheet
+      .getRange(rowIndex, 8, 1, linhaValores.length)
+      .setValues([linhaValores]);
 
     return;
 
@@ -3478,12 +3494,15 @@ function updateRecado(p) {
         }
 
 
+        // Uma única escrita cobrindo as colunas 2-7 (título,
+        // mensagem, imagem, ativo, data_criação inalterada e
+        // data_atualização), em vez de 2 chamadas separadas.
         sheet
           .getRange(
             i + 1,
             2,
             1,
-            4
+            6
           )
           .setValues([[
 
@@ -3493,19 +3512,13 @@ function updateRecado(p) {
 
             imagem,
 
-            ativo
+            ativo,
+
+            values[i][5],
+
+            new Date()
 
           ]]);
-
-
-        sheet
-          .getRange(
-            i + 1,
-            7
-          )
-          .setValue(
-            new Date()
-          );
 
 
         criarNotificacaoParaTodos(
@@ -4061,6 +4074,28 @@ function criarNotificacao(
     );
 
 
+    // Envia o push depois de gravar na planilha — se falhar, a
+    // notificação já está registrada normalmente e o polling do
+    // app (WorkManager) continua funcionando como plano B.
+    try {
+
+      var tokenDestinatario =
+        buscarTokenFcmPorNome_(ss, destinatario);
+
+      if (tokenDestinatario) {
+        enviarPushFCM(tokenDestinatario, titulo, mensagem);
+      }
+
+    } catch (pushError) {
+
+      Logger.log(
+        "Erro ao enviar push individual: " +
+        safeErrorMessage(pushError)
+      );
+
+    }
+
+
     return true;
 
 
@@ -4234,6 +4269,168 @@ function notificacaoDuplicada(
 
 
 // ============================================================
+// PUSH VIA FIREBASE CLOUD MESSAGING (FCM)
+// ------------------------------------------------------------
+// A planilha continua sendo o backend/fonte de verdade — o FCM
+// é usado só como canal de entrega. Depende da biblioteca OAuth2
+// for Apps Script (ID 1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF)
+// e das propriedades do script FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY
+// e FCM_PROJECT_ID, geradas a partir da conta de serviço do
+// Firebase (Configurações do projeto > Contas de serviço).
+// ============================================================
+
+function getServiceAccountFromProperties_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    client_email: props.getProperty("FCM_CLIENT_EMAIL"),
+    private_key: (props.getProperty("FCM_PRIVATE_KEY") || "").replace(/\\n/g, "\n"),
+    project_id: props.getProperty("FCM_PROJECT_ID")
+  };
+}
+
+function getFcmService_() {
+  var sa = getServiceAccountFromProperties_();
+  return OAuth2.createService("FCM")
+    .setTokenUrl("https://oauth2.googleapis.com/token")
+    .setPrivateKey(sa.private_key)
+    .setIssuer(sa.client_email)
+    .setPropertyStore(PropertiesService.getScriptProperties())
+    .setScope("https://www.googleapis.com/auth/firebase.messaging");
+}
+
+// Envia um push para um único token de dispositivo. Retorna
+// true/false, e nunca lança exceção para quem chamou — uma falha
+// de push nunca deve impedir a notificação de continuar gravada
+// normalmente na aba NOTIFICACOES.
+function enviarPushFCM(token, titulo, mensagem) {
+
+  if (!token) { return false; }
+
+  try {
+
+    var service = getFcmService_();
+
+    if (!service.hasAccess()) {
+      Logger.log("Erro de autenticação FCM: " + service.getLastError());
+      return false;
+    }
+
+    var sa = getServiceAccountFromProperties_();
+    var url = "https://fcm.googleapis.com/v1/projects/" + sa.project_id + "/messages:send";
+
+    var payload = {
+      message: {
+        token: token,
+        notification: {
+          title: safeString(titulo),
+          body: safeString(mensagem)
+        }
+      }
+    };
+
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      headers: { Authorization: "Bearer " + service.getAccessToken() },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    var response = UrlFetchApp.fetch(url, options);
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log("Erro ao enviar push FCM: " + response.getContentText());
+      return false;
+    }
+
+    return true;
+
+  } catch (error) {
+
+    Logger.log("Exceção ao enviar push FCM: " + safeErrorMessage(error));
+    return false;
+
+  }
+
+}
+
+// Lê a aba INTEGRANTES uma única vez e monta um mapa
+// nome normalizado -> token FCM. A coluna NOME é sempre a
+// posição 0 (mesmo padrão posicional de mapIntegrante); a coluna
+// do token é localizada pelo cabeçalho conter "token".
+function buscarMapaTokensFcm_(ss) {
+
+  var mapa = {};
+
+  var sheet = getSheetSecure(ss, ABA_INTEGRANTES);
+  if (!sheet) { return mapa; }
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) { return mapa; }
+
+  var headersInt = values[0].map(function(h) { return normalizarTexto(h); });
+
+  var colToken = -1;
+  for (var h = 0; h < headersInt.length; h++) {
+    if (headersInt[h].indexOf("token") !== -1) {
+      colToken = h;
+      break;
+    }
+  }
+
+  if (colToken < 0) { return mapa; }
+
+  for (var i = 1; i < values.length; i++) {
+    var nome = normalizarTexto(values[i][0]);
+    var token = safeString(values[i][colToken]).trim();
+    if (nome && token) { mapa[nome] = token; }
+  }
+
+  return mapa;
+
+}
+
+// Busca o token de um único destinatário (usada por
+// criarNotificacao, o caminho de notificação individual).
+function buscarTokenFcmPorNome_(ss, nome) {
+  var mapa = buscarMapaTokensFcm_(ss);
+  return mapa[normalizarTexto(nome)] || null;
+}
+
+// Envia push para vários destinatários de uma vez (usada por
+// criarNotificacoesEmLote), reaproveitando uma única leitura da
+// aba INTEGRANTES para todo o lote, em vez de uma leitura por
+// destinatário.
+function enviarPushParaLote_(ss, rowsToWrite, headersNotificacao, titulo, mensagem) {
+
+  try {
+
+    var colDestIdx = headersNotificacao.indexOf("destinatario");
+    if (colDestIdx < 0) { return; }
+
+    var mapaTokens = buscarMapaTokensFcm_(ss);
+
+    for (var r = 0; r < rowsToWrite.length; r++) {
+
+      var destinatario = normalizarTexto(rowsToWrite[r][colDestIdx]);
+      var token = mapaTokens[destinatario];
+
+      if (token) {
+        enviarPushFCM(token, titulo, mensagem);
+      }
+
+    }
+
+  } catch (error) {
+
+    Logger.log("Erro ao enviar pushes em lote: " + safeErrorMessage(error));
+
+  }
+
+}
+
+
+// ============================================================
 // NOTIFICAR TODOS
 // ============================================================
 
@@ -4244,9 +4441,6 @@ function criarNotificacaoParaTodos(
   tipo
 ) {
 
-  var inicio = Date.now();
-  Logger.log("[PERF] criarNotificacaoParaTodos INICIO");
-
   var integrantes =
     getSheetData(
       ss,
@@ -4254,23 +4448,12 @@ function criarNotificacaoParaTodos(
       mapIntegrante
     );
 
-  var nomes = integrantes.map(function(i) {
-    return safeString(i.nome).trim();
-  }).filter(function(n) {
-    return n !== "";
-  });
+  var nomes = integrantes
+    .map(function(i) { return safeString(i.nome).trim(); })
+    .filter(function(n) { return n !== ""; });
 
-  var count = criarNotificacoesEmLote(
-    ss,
-    nomes,
-    titulo,
-    mensagem,
-    tipo
-  );
+  return criarNotificacoesEmLote(ss, nomes, titulo, mensagem, tipo);
 
-  Logger.log("[PERF] criarNotificacaoParaTodos FIM. Tempo: " + (Date.now() - inicio) + "ms. Destinatários: " + nomes.length);
-
-  return count;
 }
 
 
@@ -4285,9 +4468,6 @@ function criarNotificacaoParaLideres(
   tipo
 ) {
 
-  var inicio = Date.now();
-  Logger.log("[PERF] criarNotificacaoParaLideres INICIO");
-
   var integrantes =
     getSheetData(
       ss,
@@ -4297,42 +4477,27 @@ function criarNotificacaoParaLideres(
 
   var nomesLideres = [];
 
-  for (
-    var i = 0;
-    i < integrantes.length;
-    i++
-  ) {
-
-    var funcao =
-      normalizarTexto(
-        integrantes[i].funcao
-      );
-
-    if (
-      funcao.indexOf("lider") !== -1
-    ) {
+  for (var i = 0; i < integrantes.length; i++) {
+    var funcao = normalizarTexto(integrantes[i].funcao);
+    if (funcao.indexOf("lider") !== -1) {
       var nome = safeString(integrantes[i].nome).trim();
-      if (nome) {
-        nomesLideres.push(nome);
-      }
+      if (nome) { nomesLideres.push(nome); }
     }
   }
 
-  var count = criarNotificacoesEmLote(
-    ss,
-    nomesLideres,
-    titulo,
-    mensagem,
-    tipo
-  );
+  return criarNotificacoesEmLote(ss, nomesLideres, titulo, mensagem, tipo);
 
-  Logger.log("[PERF] criarNotificacaoParaLideres FIM. Tempo: " + (Date.now() - inicio) + "ms. Lideres: " + nomesLideres.length);
-
-  return count;
 }
+
 
 // ============================================================
 // CRIAR NOTIFICAÇÕES EM LOTE (BATCH)
+// ------------------------------------------------------------
+// Substitui o padrão antigo de chamar criarNotificacao() dentro
+// de um loop (1 lock + 1 leitura + 1 escrita POR destinatário).
+// Aqui: 1 lock + 1 leitura + 1 escrita para o lote inteiro.
+// Isso é o que elimina os 15-20s de espera ao notificar todos
+// os integrantes ou todos os líderes.
 // ============================================================
 
 function criarNotificacoesEmLote(
@@ -4348,73 +4513,93 @@ function criarNotificacoesEmLote(
   }
 
   var lock = LockService.getScriptLock();
+  var rowsToWrite = [];
+  var headers = [];
+  var quantidade = 0;
+  var tituloTrim = safeString(titulo).trim();
+  var mensagemTrim = safeString(mensagem).trim();
 
   try {
-    // Pedimos o lock apenas uma vez para o lote inteiro
+
     lock.waitLock(15000);
 
     var sheet = obterAbaNotificacoes(ss);
-    var headers = obterCabecalhosNotificacao(sheet);
-    var colCount = sheet.getLastColumn();
+    headers = obterCabecalhosNotificacao(sheet);
+    var colCount = Math.max(sheet.getLastColumn(), headers.length);
 
-    // Pegamos dados recentes para checar duplicidade apenas uma vez
-    var values = sheet.getDataRange().getValues();
     var colDest = headers.indexOf("destinatario");
     var colTit = headers.indexOf("titulo");
     var colMsg = headers.indexOf("mensagem");
 
-    var rowsToWrite = [];
+    // Leitura única para checar duplicidade em memória
+    // (mesma regra de negócio de notificacaoDuplicada: só olha
+    // as últimas 20 linhas, para não pesar em planilhas grandes).
+    var values = sheet.getDataRange().getValues();
+    var checkLimit = Math.max(1, values.length - 20);
+
     var now = new Date();
 
-    for (var i = 0; i < destinatarios.length; i++) {
-      var dest = destinatarios[i];
+    for (var d = 0; d < destinatarios.length; d++) {
 
-      // Checagem de duplicidade em memória contra dados existentes
+      var destinatario = safeString(destinatarios[d]).trim();
+      if (!destinatario) { continue; }
+
       var isDup = false;
-      var checkLimit = Math.max(1, values.length - 20);
 
-      for (var j = values.length - 1; j >= checkLimit; j--) {
-        if (normalizarTexto(values[j][colDest]) === normalizarTexto(dest) &&
-            safeString(values[j][colTit]).trim() === safeString(titulo).trim() &&
-            safeString(values[j][colMsg]).trim() === safeString(mensagem).trim()) {
-          isDup = true;
-          break;
+      if (colDest >= 0 && colTit >= 0 && colMsg >= 0) {
+        for (var j = values.length - 1; j >= checkLimit; j--) {
+          if (
+            normalizarTexto(values[j][colDest]) === normalizarTexto(destinatario) &&
+            safeString(values[j][colTit]).trim() === tituloTrim &&
+            safeString(values[j][colMsg]).trim() === mensagemTrim
+          ) {
+            isDup = true;
+            break;
+          }
         }
       }
 
-      if (!isDup) {
-        var newRow = new Array(colCount).fill("");
+      if (isDup) { continue; }
 
-        definirValorColuna(newRow, headers, "id", Utilities.getUuid());
-        definirValorColuna(newRow, headers, "destinatario", dest);
-        definirValorColuna(newRow, headers, "titulo", titulo);
-        definirValorColuna(newRow, headers, "mensagem", mensagem);
-        definirValorColuna(newRow, headers, "tipo", tipo);
-        definirValorColuna(newRow, headers, "data", now);
-        definirValorColuna(newRow, headers, "lida", "NAO");
+      var newRow = new Array(colCount).fill("");
+      definirValorColuna(newRow, headers, "id", Utilities.getUuid());
+      definirValorColuna(newRow, headers, "destinatario", destinatario);
+      definirValorColuna(newRow, headers, "titulo", tituloTrim);
+      definirValorColuna(newRow, headers, "mensagem", mensagemTrim);
+      definirValorColuna(newRow, headers, "tipo", safeString(tipo).trim());
+      definirValorColuna(newRow, headers, "data", now);
+      definirValorColuna(newRow, headers, "lida", "NAO");
 
-        rowsToWrite.push(newRow);
-      }
+      rowsToWrite.push(newRow);
+      quantidade++;
     }
 
+    // ESCRITA ÚNICA para todo o lote.
     if (rowsToWrite.length > 0) {
-      // Escrita ÚNICA em lote
-      sheet.getRange(
-        sheet.getLastRow() + 1,
-        1,
-        rowsToWrite.length,
-        colCount
-      ).setValues(rowsToWrite);
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToWrite.length, colCount)
+        .setValues(rowsToWrite);
     }
-
-    return rowsToWrite.length;
 
   } catch (error) {
-    Logger.log("Erro no batch de notificações: " + error);
+
+    Logger.log("Erro no batch de notificações: " + safeErrorMessage(error));
     return 0;
+
   } finally {
-    try { lock.releaseLock(); } catch(e) {}
+
+    try { lock.releaseLock(); } catch (e) {}
+
   }
+
+  // Envio dos pushes acontece FORA do lock — já foi liberado,
+  // então outras requisições não ficam esperando enquanto os
+  // pushes (um por destinatário) são enviados um a um.
+  if (rowsToWrite.length > 0) {
+    enviarPushParaLote_(ss, rowsToWrite, headers, tituloTrim, mensagemTrim);
+  }
+
+  return quantidade;
+
 }
 
 
@@ -4727,6 +4912,210 @@ function getNotificacoes(params) {
 // ============================================================
 // MARCAR UMA COMO LIDA
 // ============================================================
+
+// ============================================================
+// ATUALIZAR TOKEN FCM
+// ------------------------------------------------------------
+// Recebe {nome, token} do app (enviado logo após o login e
+// sempre que o Firebase gera um token novo para o dispositivo)
+// e grava esse token na aba INTEGRANTES, na coluna FCM_TOKEN.
+// É esse token que criarNotificacao / criarNotificacoesEmLote
+// vão usar para saber para qual dispositivo enviar cada push.
+// ============================================================
+
+function atualizarTokenFcm(
+  params
+) {
+
+  try {
+
+    var ss =
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
+
+
+    var sheet =
+      getSheetSecure(
+        ss,
+        ABA_INTEGRANTES
+      );
+
+
+    if (!sheet) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Aba de integrantes não encontrada."
+
+      };
+
+    }
+
+
+    var nome =
+      safeString(
+        params.nome
+      ).trim();
+
+
+    var token =
+      safeString(
+        params.token
+      ).trim();
+
+
+    if (!nome) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Nome não informado."
+
+      };
+
+    }
+
+
+    if (!token) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Token não informado."
+
+      };
+
+    }
+
+
+    var values =
+      sheet
+        .getDataRange()
+        .getValues();
+
+
+    // A coluna NOME nesta aba é sempre a primeira (posição 0),
+    // igual ao que mapIntegrante já assume para o resto do
+    // sistema — esta aba não usa busca por texto de cabeçalho
+    // para essa coluna.
+    var colNome = 0;
+
+
+    // Já a coluna do token é nova, então localizamos pelo texto
+    // do cabeçalho de forma tolerante (aceita "FCM_TOKEN",
+    // "FCM TOKEN", "Token FCM", etc. — qualquer célula que
+    // contenha "token" no cabeçalho).
+    var headers =
+      values[0].map(
+        function(header) {
+          return normalizarTexto(header);
+        }
+      );
+
+
+    var colToken = -1;
+
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h].indexOf("token") !== -1) {
+        colToken = h;
+        break;
+      }
+    }
+
+
+    if (colToken < 0) {
+
+      return {
+
+        sucesso: false,
+
+        mensagem:
+          "Coluna de token FCM não encontrada na aba INTEGRANTES. " +
+          "O cabeçalho dessa coluna precisa conter a palavra \"token\" " +
+          "(ex: FCM_TOKEN)."
+
+      };
+
+    }
+
+
+    for (
+      var i = 1;
+      i < values.length;
+      i++
+    ) {
+
+      if (
+
+        normalizarTexto(
+          values[i][colNome]
+        ) ===
+        normalizarTexto(nome)
+
+      ) {
+
+        sheet
+          .getRange(
+            i + 1,
+            colToken + 1
+          )
+          .setValue(
+            token
+          );
+
+
+        return {
+
+          sucesso: true,
+
+          mensagem:
+            "Token atualizado com sucesso."
+
+        };
+
+      }
+
+    }
+
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Integrante não encontrado: " + nome
+
+    };
+
+  } catch (error) {
+
+    Logger.log(
+      "Erro em atualizarTokenFcm: " +
+      safeErrorMessage(error)
+    );
+
+    return {
+
+      sucesso: false,
+
+      mensagem:
+        "Erro ao atualizar token: " +
+        safeErrorMessage(error)
+
+    };
+
+  }
+
+}
+
 
 function marcarNotificacaoLida(
   params
@@ -5078,6 +5467,9 @@ function marcarTodasNotificacoesLidas(
     var quantidade =
       0;
 
+    // Monta a coluna LIDA inteira em memória e grava tudo de
+    // uma vez só, em vez de 1 setValue() por linha encontrada.
+    var colunaLida = [];
 
     for (
       var i = 1;
@@ -5085,39 +5477,27 @@ function marcarTodasNotificacoesLidas(
       i++
     ) {
 
+      var valorAtual = values[i][colLida];
+
       if (
-
-        normalizarTexto(
-          values[i][colDest]
-        ) ===
-        normalizarTexto(nome)
-
+        normalizarTexto(values[i][colDest]) === normalizarTexto(nome) &&
+        normalizarTexto(valorAtual) !== "sim"
       ) {
 
-        if (
+        colunaLida.push(["SIM"]);
+        quantidade++;
 
-          normalizarTexto(
-            values[i][colLida]
-          ) !== "sim"
+      } else {
 
-        ) {
-
-          sheet
-            .getRange(
-              i + 1,
-              colLida + 1
-            )
-            .setValue(
-              "SIM"
-            );
-
-
-          quantidade++;
-
-        }
+        colunaLida.push([valorAtual]);
 
       }
 
+    }
+
+    if (quantidade > 0) {
+      sheet.getRange(2, colLida + 1, colunaLida.length, 1)
+        .setValues(colunaLida);
     }
 
 
@@ -5484,41 +5864,44 @@ function limparNotificacoesLidas(
     }
 
 
-    var removidas =
-      0;
+    // Em vez de sheet.deleteRow() repetido (cada chamada reindexa
+    // a planilha inteira), filtramos em memória e reescrevemos os
+    // dados de uma só vez: 1 limpeza + 1 escrita, não importa
+    // quantas notificações sejam removidas.
 
-
-    // Sempre de baixo para cima.
+    var colCount = values[0].length;
+    var linhasMantidas = [];
+    var removidas = 0;
 
     for (
-      var i = values.length - 1;
-      i >= 1;
-      i--
+      var i = 1;
+      i < values.length;
+      i++
     ) {
 
-      if (
+      var doUsuario =
+        normalizarTexto(values[i][colDest]) === normalizarTexto(nome);
 
-        normalizarTexto(
-          values[i][colDest]
-        ) ===
-        normalizarTexto(nome)
+      var estaLida =
+        normalizarTexto(values[i][colLida]) === "sim";
 
-        &&
-
-        normalizarTexto(
-          values[i][colLida]
-        ) ===
-        "sim"
-
-      ) {
-
-        sheet.deleteRow(
-          i + 1
-        );
-
-
+      if (doUsuario && estaLida) {
         removidas++;
+      } else {
+        linhasMantidas.push(values[i]);
+      }
 
+    }
+
+    if (removidas > 0) {
+
+      // Limpa todo o bloco de dados atual...
+      sheet.getRange(2, 1, values.length - 1, colCount).clearContent();
+
+      // ...e regrava só o que sobrou, em uma única chamada.
+      if (linhasMantidas.length > 0) {
+        sheet.getRange(2, 1, linhasMantidas.length, colCount)
+          .setValues(linhasMantidas);
       }
 
     }
@@ -7230,4 +7613,18 @@ function responseJSON(
 
   }
 
+}
+
+
+// teste notificação
+
+function testarEnvioPush() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var token = buscarTokenFcmPorNome_(ss, "JADSON");
+  Logger.log("Token encontrado: " + token);
+
+  if (token) {
+    var enviado = enviarPushFCM(token, "Teste FCM", "Se você recebeu isso, funcionou!");
+    Logger.log("Push enviado: " + enviado);
+  }
 }
